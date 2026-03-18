@@ -1,0 +1,15 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+bin/
+lib/
+include/
+dist/
+build/
+.env
+api_test_output.txt
+gunicorn.ctl

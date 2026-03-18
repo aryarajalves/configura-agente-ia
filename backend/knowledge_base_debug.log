@@ -1,0 +1,10 @@
+2026-03-05 14:40:03.352318: CREATE KB - Received type: 'product', Name: 'Nova Base de Conhecimento - Teste'
+2026-03-05 14:40:03.372613: CREATE KB - Saved ID 15 as type 'product'
+2026-03-05 14:40:10.410722: IMPORT PRODUCTS KB 15 - Arquivo: lista de produtos - página1.csv
+2026-03-05 14:40:10.410735: Primary Col: Nome, Mapping: [{"label":"Nome: ","column":"Nome"},{"label":"Descrição: ","column":"Descrição"},{"label":"Preço: ","column":"Preço"}]
+2026-03-05 15:18:57.692907: CREATE KB - Received type: 'product', Name: 'Eneagrama - Produtos'
+2026-03-05 15:18:57.710082: CREATE KB - Saved ID 16 as type 'product'
+2026-03-05 15:19:13.138557: IMPORT PRODUCTS KB 16 - Arquivo: lista de produtos - página1.csv
+2026-03-05 15:19:13.138596: Primary Col: Nome, Mapping: [{"label":"Nome: ","column":"Nome"},{"label":"Descrição: ","column":"Descrição"},{"label":"Preço: ","column":"Preço"}]
+2026-03-05 15:20:46.747129: UPDATE KB 16 - Received type: 'product'
+2026-03-05 15:20:46.763516: UPDATE KB 16 - Saved type: 'product'

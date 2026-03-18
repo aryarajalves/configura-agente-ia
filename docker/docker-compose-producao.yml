@@ -1,0 +1,111 @@
+version: '3.8'
+
+# ============================================================
+# PRODUCAO — Docker Swarm + Traefik
+# Banco de dados externo (já existe no servidor).
+#
+# Subir:
+#   docker stack deploy -c docker-compose-producao.yml agentes
+#
+# Remover:
+#   docker stack rm agentes
+# ============================================================
+
+services:
+
+  # ----------------------------------------------------------
+  # BACKEND — FastAPI + Gunicorn
+  # ----------------------------------------------------------
+  backend:
+    image: aryarajalves/configurar-agentes-ia:1.1.1-backend
+    hostname: "{{.Service.Name}}.{{.Task.Slot}}"
+    networks:
+      - network_swarm_public
+    environment:
+      # --- Banco de Dados e Concorrência ---
+      - DATABASE_URL=${DATABASE_URL} # URL de conexão ao PostgreSQL (Externo)
+      - GUNICORN_WORKERS=${GUNICORN_WORKERS:-5} # Ajustado para 5 workers (Ideal para 2 CPUs)
+
+      # --- Integrações com IA ---
+      - OPENAI_API_KEY=${OPENAI_API_KEY} # Chave para geração de texto (GPT) e embeddings (OpenAI)
+      - GEMINI_API_KEY=${GEMINI_API_KEY} # Chave para modelos Google Gemini (Alternativo)
+
+      # --- Segurança Padrão (APIs Públicas) ---
+      - AGENT_API_KEY=${AGENT_API_KEY} # Senha master da API. Usada pelo N8N, Chat e Webhooks para usar o endpoint /execute.
+
+      # --- Segurança de Painel de Administração e Sessão (Obrigatório) ---
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY} # Assinatura criptográfica dos tokens de Login. Mantém administradores logados de forma segura.
+      - ADMIN_EMAIL=${ADMIN_EMAIL} # E-mail do usuário Super Administrador do painel
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD} # Senha do usuário Super Administrador
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS} # Proteção do navegador. Lista de domínios (ex: https://meusite.com) autorizados a se comunicar.
+
+      # --- Google Calendar (Opcional) ---
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID} # ID da credencial OAuth do painel Google Cloud
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET} # Secret da credencial OAuth
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI} # URL de retorno exata após o usuário fazer login no Google
+
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1024M
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.agentes_backend.rule=Host(`${DOMAIN_BACKEND}`)
+        - traefik.http.routers.agentes_backend.entrypoints=websecure
+        - traefik.http.routers.agentes_backend.tls.certresolver=letsencryptresolver
+        - traefik.http.routers.agentes_backend.service=agentes_backend
+        - traefik.http.services.agentes_backend.loadbalancer.server.port=8000
+        - traefik.http.services.agentes_backend.loadbalancer.passhostheader=true
+        - traefik.http.middlewares.sslheader.headers.customrequestheaders.X-Forwarded-Proto=https
+        - traefik.http.routers.agentes_backend.middlewares=sslheader@docker
+
+  # ----------------------------------------------------------
+  # FRONTEND — React (build estático) + Nginx
+  # ----------------------------------------------------------
+  frontend:
+    image: aryarajalves/configurar-agentes-ia:1.1.1-frontend
+    hostname: "{{.Service.Name}}.{{.Task.Slot}}"
+    networks:
+      - network_swarm_public
+    secrets:
+      - source: VITE_API_URL
+        target: VITE_API_URL # Informa ao frontend estático onde o backend está hospedado
+      - source: VITE_AGENT_API_KEY
+        target: VITE_AGENT_API_KEY # Chave API injetada no código do site
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.agentes_frontend.rule=Host(`${DOMAIN_FRONTEND}`)
+        - traefik.http.routers.agentes_frontend.entrypoints=websecure
+        - traefik.http.routers.agentes_frontend.tls.certresolver=letsencryptresolver
+        - traefik.http.routers.agentes_frontend.service=agentes_frontend
+        - traefik.http.services.agentes_frontend.loadbalancer.server.port=80
+        - traefik.http.services.agentes_frontend.loadbalancer.passhostheader=true
+        - traefik.http.middlewares.sslheader.headers.customrequestheaders.X-Forwarded-Proto=https
+        - traefik.http.routers.agentes_frontend.middlewares=sslheader@docker
+
+networks:
+  network_swarm_public:
+    external: true
+    name: network_swarm_public
+
+secrets:
+  VITE_API_URL:
+    external: true
+  VITE_AGENT_API_KEY:
+    external: true

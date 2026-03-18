@@ -1,0 +1,27 @@
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Site do Cliente - Teste do Widget</title>
+    <style>
+        body { background: #0f172a; color: white; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .hero { text-align: center; }
+        h1 { font-size: 3rem; margin-bottom: 20px; background: linear-gradient(to right, #6366f1, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <h1>Este é o site do seu cliente 🌐</h1>
+        <p>O widget de IA deve aparecer no canto inferior direito.</p>
+    </div>
+
+    <!-- WIDGET ANTIGRAVITY -->
+    <script 
+        src="http://localhost:8000/static/widget.js" 
+        data-agent-id="2" 
+        data-title="IA do SalesForce">
+    </script>
+</body>
+</html>
