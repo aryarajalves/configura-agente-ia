@@ -1,6 +1,6 @@
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
-from config_store import AgentConfig
+from config_store import AgentConfig, get_real_model_id, get_model_pricing, format_ai_params
 from rag_service import search_knowledge_base
 from sqlalchemy.ext.asyncio import AsyncSession
 import json
@@ -909,7 +909,6 @@ async def process_message(
                 
                 try:
                     # === SELEÇÃO DO MODELO (Resolve família → ID real via API) ===
-                    from config_store import get_real_model_id, get_model_pricing, format_ai_params
                     api_model_name = get_real_model_id(current_model)
                     
                     # PREPARA PARÂMETROS BASE

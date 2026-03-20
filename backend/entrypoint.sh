@@ -18,12 +18,21 @@ done
 
 echo "✅ Banco de dados disponível."
 
-echo "🛠️ Verificando/Criando banco de dados se necessário..."
-python -c "import asyncio; import models; from database import init_db; asyncio.run(init_db())"
+if [ "$1" != "celery" ]; then
+    echo "🛠️ Verificando/Criando banco de dados se necessário..."
+    python -c "import asyncio; import models; from database import init_db; asyncio.run(init_db())"
 
-echo "🔄 Rodando migrações (alembic upgrade head)..."
-python -c "from alembic.config import main; main(argv=['upgrade', 'head'])"
-echo "✅ Migrações concluídas."
+    echo "🔄 Rodando migrações (alembic upgrade head)..."
+    python -c "from alembic.config import main; main(argv=['upgrade', 'head'])"
+    echo "✅ Migrações concluídas."
+else
+    echo "⏭️ Pulando migrações (Serviço Celery Identificado)..."
+fi
 
-echo "🚀 Iniciando aplicação..."
-exec python -m gunicorn main:app -w "${GUNICORN_WORKERS:-4}" -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --timeout 120
+if [ $# -gt 0 ]; then
+    echo "🚀 Executando comando recebido: $@"
+    exec "$@"
+else
+    echo "🚀 Iniciando aplicação web..."
+    exec python -m gunicorn main:app -w "${GUNICORN_WORKERS:-4}" -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --timeout 120
+fi

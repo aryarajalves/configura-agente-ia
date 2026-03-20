@@ -5,6 +5,8 @@ from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 from models import KnowledgeItemModel, KnowledgeBaseModel, AgentConfigModel
+from config_store import get_real_model_id
+from config_store import get_real_model_id
 
 load_dotenv()
 
@@ -21,7 +23,6 @@ async def call_rag_llm(messages: list, model: str = "gpt-4o-mini", fallback: str
         if not m: continue
         
         from agent import get_openai_client
-        from config_store import get_real_model_id
         
         client = get_openai_client(m)
         api_model = get_real_model_id(m)
