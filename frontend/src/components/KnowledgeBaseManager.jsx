@@ -40,6 +40,9 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
     const [showConfigPopup, setShowConfigPopup] = useState(false);
     const [showRagConfigPopup, setShowRagConfigPopup] = useState(false);
     const [selectedVideoFile, setSelectedVideoFile] = useState(null);
+    const [showMediaSelectionModal, setShowMediaSelectionModal] = useState(false);
+    const [selectedMediaType, setSelectedMediaType] = useState('media');
+    const textMediaInputRef = useRef(null);
     const [transcriptionProgress, setTranscriptionProgress] = useState(0);
     const [transcriptionConfig, setTranscriptionConfig] = useState({
         autoLanguage: true,
@@ -53,9 +56,13 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
         extractChunks: false,
         generateSummary: false,
         chunkSize: 1200,
-        chunkOverlap: 150,
-        metadata: ''
+        chunkOverlap: 150
     });
+    
+    // Lista de metadados
+    const [metadata, setMetadata] = useState([{ name: '', content: '' }]);
+    const [isJsonModalOpen, setIsJsonModalOpen] = useState(false);
+    const [jsonInput, setJsonInput] = useState('');
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [isCreatingRag, setIsCreatingRag] = useState(false);
     const [showMaximizedTranscription, setShowMaximizedTranscription] = useState(false);
@@ -473,63 +480,76 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
         const file = e.target.files[0];
         if (!file) return;
         setSelectedVideoFile(file);
-        handleConfirmTranscription(file);
+        setSelectedMediaType('media');
+        setShowRagConfigPopup(true);
+        setShowMediaSelectionModal(false);
+        e.target.value = '';
+    };
+
+    const handleTextMediaTranscribe = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        setSelectedVideoFile(file);
+        setSelectedMediaType('text');
+        setShowRagConfigPopup(true);
+        setShowMediaSelectionModal(false);
+        e.target.value = '';
+    };
+
+    const handleMetadataChange = (index, field, value) => {
+        const newMetadata = [...metadata];
+        newMetadata[index][field] = value;
+        setMetadata(newMetadata);
+    };
+
+    const addMetadataRow = () => {
+        setMetadata([...metadata, { name: '', content: '' }]);
+    };
+
+    const removeMetadataRow = (index) => {
+        const newMetadata = [...metadata];
+        newMetadata.splice(index, 1);
+        setMetadata(newMetadata);
+    };
+
+    const handleJsonMerge = () => {
+        try {
+            const parsed = JSON.parse(jsonInput);
+            if (!parsed.metadata || typeof parsed.metadata !== 'object') {
+                alert('O JSON deve conter um objeto "metadata". Ex: { "metadata": { "chave": "valor" } }');
+                return;
+            }
+
+            const currentMap = new Map();
+            metadata.forEach(item => {
+                if (item.name) currentMap.set(item.name, item.content);
+            });
+
+            // Sobrescreve ou adiciona
+            Object.entries(parsed.metadata).forEach(([k, v]) => {
+                currentMap.set(k, String(v));
+            });
+
+            // Reconstrói a lista
+            const updatedMetadata = [];
+            currentMap.forEach((val, key) => {
+                updatedMetadata.push({ name: key, content: val });
+            });
+            
+            if (updatedMetadata.length === 0) {
+                updatedMetadata.push({ name: '', content: '' });
+            }
+
+            setMetadata(updatedMetadata);
+            setIsJsonModalOpen(false);
+            setJsonInput('');
+        } catch (e) {
+            alert('JSON inválido');
+        }
     };
 
     const handleConfirmTranscription = async (fileToUse = null) => {
-        const file = fileToUse || selectedVideoFile;
-        if (!file) return;
-        
-        setShowConfigPopup(false);
-        setIsTranscribing(true);
-        setTranscriptionProgress(0);
-
-        // Simulação de progresso (0 a 95%)
-        const progressInterval = setInterval(() => {
-            setTranscriptionProgress(prev => {
-                if (prev >= 95) {
-                    clearInterval(progressInterval);
-                    return 95;
-                }
-                const increment = Math.random() * 5;
-                return Math.min(95, prev + increment);
-            });
-        }, 1000);
-
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('config', JSON.stringify(transcriptionConfig));
-        
-        try {
-            const response = await api.post('/knowledge-bases/transcribe', formData);
-            
-            if (response.ok) {
-                const data = await response.json();
-                clearInterval(progressInterval);
-                setTranscriptionProgress(100);
-                setTimeout(() => {
-                    setTranscriptionResult(data.text);
-                    setTranscriptionMetrics({
-                        duration: data.duration,
-                        tokens: data.tokens,
-                        cost_usd: data.cost_usd
-                    });
-                    // Mantemos o states isTranscribing TRUE para o usuário ver os "Próximos Passos"
-                    // e habilitamos o botão de gerar lá.
-                    // Não mostramos o popup anterior para não confundir.
-                }, 500);
-            } else {
-                clearInterval(progressInterval);
-                const err = await response.json().catch(() => ({}));
-                alert(`Erro na transcrição: ${err.detail || 'Falha na comunicação com o servidor'}`);
-                setIsTranscribing(false);
-            }
-        } catch (e) {
-            clearInterval(progressInterval);
-            console.error(e);
-            alert("Erro ao enviar arquivo para transcrição.");
-            setIsTranscribing(false);
-        }
+        // Obsoleto - foi substituído pelo processamento em background após configuração de RAG
     };
 
     const handleFileUpload = async (event) => {
@@ -562,18 +582,31 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
     const hasItems = filteredItems.length > 0;
 
     const handleCreateRag = async () => {
+        if (!selectedVideoFile) return;
         setIsCreatingRag(true);
         try {
-            const response = await api.post(`/knowledge-bases/${kbId}/process-transcription`, {
-                text: transcriptionResult,
-                config: ragConfig
+            // Formata metadados para objeto
+            const formattedMetadata = {};
+            metadata.forEach(item => {
+                if (item.name.trim()) {
+                    formattedMetadata[item.name.trim()] = item.content;
+                }
             });
+            const finalRagConfig = {
+                ...ragConfig,
+                metadata: formattedMetadata
+            };
+
+            const formData = new FormData();
+            formData.append('file', selectedVideoFile);
+            formData.append('config', JSON.stringify(finalRagConfig));
+            formData.append('is_media', selectedMediaType === 'media' ? 'true' : 'false');
+
+            const response = await api.post(`/knowledge-bases/${kbId}/video-background`, formData);
             
             if (response.ok) {
-                // Keep overlay until modal shows
                 setShowRagConfigPopup(false);
                 setShowSuccessModal(true);
-                setIsTranscribing(false);
             } else {
                 const err = await response.json().catch(() => ({}));
                 alert(`Erro ao criar RAG: ${err.detail || 'Falha no processamento'}`);
@@ -583,6 +616,7 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
             alert("Erro na comunicação com o servidor.");
         } finally {
             setIsCreatingRag(false);
+            setSelectedVideoFile(null);
         }
     };
 
@@ -684,8 +718,8 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                     {kbType !== 'product' && (
                         <>
                             <button onClick={handlePasteText} className="kb-quick-action-btn">📋 Colar Texto</button>
-                            <button onClick={() => videoInputRef.current.click()} className="kb-quick-action-btn" disabled={isTranscribing}>
-                                {isTranscribing ? '🔄 Transcrevendo...' : '📽️ Transcrição de Vídeo'}
+                            <button onClick={() => setShowMediaSelectionModal(true)} className="kb-quick-action-btn">
+                                📽️ Transcrição de Vídeo
                             </button>
                             <button onClick={() => fileInputRef.current.click()} className="kb-quick-action-btn" disabled={uploading}>
                                 {uploading ? '🔄 Processando...' : '📄 Upload PDF/DOCX'}
@@ -699,10 +733,10 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                             />
                             <input
                                 type="file"
-                                ref={fileInputRef}
+                                ref={textMediaInputRef}
                                 style={{ display: 'none' }}
-                                onChange={handleFileUpload}
-                                accept=".pdf,.docx,.txt"
+                                onChange={handleTextMediaTranscribe}
+                                accept=".txt"
                             />
                         </>
                     )}
@@ -2677,6 +2711,73 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                 document.body
             )}
 
+            {/* MEDIA SELECTION MODAL */}
+            {showMediaSelectionModal && document.body && createPortal(
+                <div style={{
+                    position: 'fixed', inset: 0, background: 'rgba(7, 10, 20, 0.95)',
+                    backdropFilter: 'blur(15px)', zIndex: 100000, display: 'flex',
+                    alignItems: 'center', justifyContent: 'center', padding: '20px'
+                }}>
+                    <div className="fade-in" style={{
+                        background: '#0f172a', border: '1px solid rgba(99, 102, 241, 0.3)',
+                        borderRadius: '32px', width: '100%', maxWidth: '500px',
+                        padding: '40px', boxShadow: '0 30px 60px rgba(0,0,0,0.8)'
+                    }}>
+                        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+                            <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📽️</div>
+                            <h2 style={{ color: 'white', fontSize: '1.8rem', fontWeight: 900, marginBottom: '8px' }}>Selecione a Mídia</h2>
+                            <p style={{ color: '#94a3b8', fontSize: '1rem' }}>Como você deseja enviar o conteúdo?</p>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
+                            <button
+                                onClick={() => videoInputRef.current.click()}
+                                style={{
+                                    display: 'flex', alignItems: 'center', gap: '16px',
+                                    background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.3)',
+                                    padding: '20px', borderRadius: '20px', cursor: 'pointer', transition: 'all 0.2s',
+                                    textAlign: 'left', color: 'white'
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(99, 102, 241, 0.2)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'rgba(99, 102, 241, 0.1)'}
+                            >
+                                <div style={{ fontSize: '2rem' }}>🎬</div>
+                                <div>
+                                    <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>Arquivo de Vídeo/Áudio</div>
+                                    <div style={{ color: '#a5b4fc', fontSize: '0.85rem', marginTop: '4px' }}>MP4, MP3, WAV (Será transcrito usando IA)</div>
+                                </div>
+                            </button>
+
+                            <button
+                                onClick={() => textMediaInputRef.current.click()}
+                                style={{
+                                    display: 'flex', alignItems: 'center', gap: '16px',
+                                    background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)',
+                                    padding: '20px', borderRadius: '20px', cursor: 'pointer', transition: 'all 0.2s',
+                                    textAlign: 'left', color: 'white'
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)'}
+                            >
+                                <div style={{ fontSize: '2rem' }}>📄</div>
+                                <div>
+                                    <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>Arquivo de Texto (.txt)</div>
+                                    <div style={{ color: '#6ee7b7', fontSize: '0.85rem', marginTop: '4px' }}>Texto já pronto e transcrito</div>
+                                </div>
+                            </button>
+                        </div>
+
+                        <button
+                            onClick={() => setShowMediaSelectionModal(false)}
+                            style={{ width: '100%', padding: '16px', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none', borderRadius: '16px', fontWeight: 700, cursor: 'pointer' }}
+                        >
+                            Cancelar
+                        </button>
+                    </div>
+                </div>,
+                document.body
+            )}
+
             {/* RAG CONFIGURATION POPUP */}
             {showRagConfigPopup && document.body && createPortal(
                 <div style={{
@@ -2700,38 +2801,61 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                         boxShadow: '0 30px 60px rgba(0,0,0,0.8)'
                     }}>
                         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-                            <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🧠</div>
-                            <h2 style={{ color: 'white', fontSize: '2rem', fontWeight: 900, marginBottom: '8px' }}>Configurar Inteligência RAG</h2>
-                            <p style={{ color: '#94a3b8', fontSize: '1.1rem' }}>Como você quer que a IA processe esse texto transcrito?</p>
+                            <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🎬</div>
+                            <h2 style={{ color: 'white', fontSize: '2rem', fontWeight: 900, marginBottom: '8px' }}>Processamento de Mídia</h2>
+                            <p style={{ color: '#94a3b8', fontSize: '1.1rem' }}>Configure a importação com IA e a extração para a base de conhecimentos.</p>
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '32px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px' }}>
+                            <div 
+                                className={`config-option ${ragConfig.generateSummary ? 'active' : ''}`}
+                                onClick={() => setRagConfig(prev => ({ ...prev, generateSummary: !prev.generateSummary }))}
+                                style={{
+                                    display: 'flex', alignItems: 'center', gap: '16px',
+                                    background: ragConfig.generateSummary ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                                    border: `1px solid ${ragConfig.generateSummary ? '#3b82f6' : 'rgba(255, 255, 255, 0.1)'}`,
+                                    padding: '12px 20px', borderRadius: '16px', cursor: 'pointer', transition: 'all 0.2s'
+                                }}
+                            >
+                                <div style={{ fontSize: '1.5rem' }}>📄</div>
+                                <div>
+                                    <div style={{ color: 'white', fontWeight: 800, fontSize: '0.95rem' }}>Gerar Resumo IA</div>
+                                    <div style={{ color: '#cbd5e1', fontSize: '0.8rem', marginTop: '2px' }}>Cria um resumo consolidado de todo o conteúdo.</div>
+                                </div>
+                            </div>
+                            
                             <div 
                                 className={`config-option ${ragConfig.extractQA ? 'active' : ''}`}
                                 onClick={() => setRagConfig(prev => ({ ...prev, extractQA: !prev.extractQA }))}
                                 style={{
+                                    display: 'flex', alignItems: 'center', gap: '16px',
                                     background: ragConfig.extractQA ? 'rgba(99, 102, 241, 0.15)' : 'rgba(255, 255, 255, 0.03)',
                                     border: `1px solid ${ragConfig.extractQA ? '#6366f1' : 'rgba(255, 255, 255, 0.1)'}`,
-                                    padding: '20px', borderRadius: '24px', cursor: 'pointer', transition: 'all 0.2s', textAlign: 'center'
+                                    padding: '12px 20px', borderRadius: '16px', cursor: 'pointer', transition: 'all 0.2s'
                                 }}
                             >
-                                <div style={{ fontSize: '2rem', marginBottom: '8px' }}>❓</div>
-                                <div style={{ color: 'white', fontWeight: 800, fontSize: '1.1rem' }}>Extrair Perguntas</div>
-                                <div style={{ color: '#cbd5e1', fontSize: '0.85rem', lineHeight: 1.4, marginTop: '5px' }}>Cria pares de Pergunta/Resposta automáticos.</div>
+                                <div style={{ fontSize: '1.5rem' }}>❓</div>
+                                <div>
+                                    <div style={{ color: 'white', fontWeight: 800, fontSize: '0.95rem' }}>Extrair Perguntas</div>
+                                    <div style={{ color: '#cbd5e1', fontSize: '0.8rem', marginTop: '2px' }}>Cria pares de Pergunta/Resposta automáticos.</div>
+                                </div>
                             </div>
 
                             <div 
                                 className={`config-option ${ragConfig.extractChunks ? 'active' : ''}`}
                                 onClick={() => setRagConfig(prev => ({ ...prev, extractChunks: !prev.extractChunks }))}
                                 style={{
+                                    display: 'flex', alignItems: 'center', gap: '16px',
                                     background: ragConfig.extractChunks ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.03)',
                                     border: `1px solid ${ragConfig.extractChunks ? '#10b981' : 'rgba(255, 255, 255, 0.1)'}`,
-                                    padding: '20px', borderRadius: '24px', cursor: 'pointer', transition: 'all 0.2s', textAlign: 'center'
+                                    padding: '12px 20px', borderRadius: '16px', cursor: 'pointer', transition: 'all 0.2s'
                                 }}
                             >
-                                <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🧩</div>
-                                <div style={{ color: 'white', fontWeight: 800, fontSize: '1.1rem' }}>Extrair Chunks</div>
-                                <div style={{ color: '#cbd5e1', fontSize: '0.85rem', lineHeight: 1.4, marginTop: '5px' }}>Divide em blocos de conhecimento puro.</div>
+                                <div style={{ fontSize: '1.5rem' }}>🧩</div>
+                                <div>
+                                    <div style={{ color: 'white', fontWeight: 800, fontSize: '0.95rem' }}>Extrair Chunks</div>
+                                    <div style={{ color: '#cbd5e1', fontSize: '0.8rem', marginTop: '2px' }}>Divide em blocos de conhecimento puro.</div>
+                                </div>
                             </div>
                         </div>
 
@@ -2796,27 +2920,61 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                             </div>
                         )}
 
-                        <div style={{ marginBottom: '32px' }}>
-                            <label style={{ display: 'block', color: '#818cf8', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '1px' }}>Metadados do Conteúdo (Opcional)</label>
-                            <input 
-                                type="text"
-                                placeholder="Ex: Treinamento Vendas, Aula 01, Contexto jurídico..."
-                                value={ragConfig.metadata}
-                                onChange={e => setRagConfig(prev => ({ ...prev, metadata: e.target.value }))}
-                                style={{
-                                    width: '100%',
-                                    background: 'rgba(255,255,255,0.03)',
-                                    border: '1px solid rgba(255,255,255,0.1)',
-                                    borderRadius: '16px',
-                                    padding: '16px 20px',
-                                    color: 'white',
-                                    fontSize: '1rem',
-                                    outline: 'none',
-                                    transition: 'border-color 0.2s'
-                                }}
-                                onFocus={e => e.target.style.borderColor = '#6366f1'}
-                                onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
-                            />
+                        <div className="form-group" style={{ marginBottom: '32px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                                <label style={{ margin: 0, color: '#818cf8', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>Metadados Comuns</label>
+                                <button 
+                                    type="button" 
+                                    onClick={() => setIsJsonModalOpen(true)}
+                                    style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
+                                    {`{ JSON }`}
+                                </button>
+                            </div>
+                            
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {metadata.map((item, index) => (
+                                    <div key={index} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                        <input 
+                                            type="text" 
+                                            placeholder="Nome (Ex: categoria)" 
+                                            style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '12px 16px', color: 'white', fontSize: '0.95rem', outline: 'none' }}
+                                            value={item.name}
+                                            onChange={(e) => handleMetadataChange(index, 'name', e.target.value)}
+                                            onFocus={e => e.target.style.borderColor = '#6366f1'}
+                                            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+                                        />
+                                        <input 
+                                            type="text" 
+                                            placeholder="Conteúdo (Ex: Tecnologia)" 
+                                            style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '12px 16px', color: 'white', fontSize: '0.95rem', outline: 'none' }}
+                                            value={item.content}
+                                            onChange={(e) => handleMetadataChange(index, 'content', e.target.value)}
+                                            onFocus={e => e.target.style.borderColor = '#6366f1'}
+                                            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+                                        />
+                                        <button 
+                                            type="button" 
+                                            onClick={() => removeMetadataRow(index)}
+                                            title="Remover"
+                                            style={{ background: '#ef4444', color: '#fff', border: 'none', width: '42px', height: '42px', borderRadius: '12px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '18px', transition: 'background 0.2s' }}
+                                            onMouseEnter={e => e.currentTarget.style.background = '#dc2626'}
+                                            onMouseLeave={e => e.currentTarget.style.background = '#ef4444'}
+                                        >
+                                            🗑️
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                            
+                            <button 
+                                type="button" 
+                                onClick={addMetadataRow}
+                                style={{ background: 'rgba(255,255,255,0.05)', color: 'white', border: '1px dashed rgba(255,255,255,0.2)', padding: '12px', borderRadius: '12px', cursor: 'pointer', marginTop: '16px', width: '100%', fontWeight: '600', transition: 'all 0.2s' }}
+                                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; }}
+                            >
+                                + Adicionar Item Metadado
+                            </button>
                         </div>
 
                         <div style={{ display: 'flex', gap: '16px' }}>
@@ -2860,6 +3018,55 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                 </div>,
                 document.body
             )}
+
+            {/* JSON IMPORT MODAL */}
+            {isJsonModalOpen && document.body && createPortal(
+                <div style={{
+                    position: 'fixed', inset: 0, background: 'rgba(7, 10, 20, 0.95)',
+                    backdropFilter: 'blur(15px)', zIndex: 100002, display: 'flex',
+                    alignItems: 'center', justifyContent: 'center', padding: '20px'
+                }}>
+                    <div className="fade-in" style={{
+                        background: '#0f172a', border: '1px solid rgba(59, 130, 246, 0.3)',
+                        borderRadius: '24px', width: '100%', maxWidth: '500px',
+                        padding: '32px', boxShadow: '0 30px 60px rgba(0,0,0,0.8)'
+                    }}>
+                        <h3 style={{ marginTop: 0, marginBottom: '15px', color: 'white', fontSize: '1.5rem', fontWeight: 800 }}>Importar JSON</h3>
+                        <p style={{ color: '#94a3b8', fontSize: '0.95rem', marginBottom: '20px' }}>Cole abaixo o JSON contendo os metadados. Valores existentes serão substituídos ou mesclados.</p>
+                        <textarea 
+                            style={{ 
+                                width: '100%', height: '200px', fontFamily: 'monospace', 
+                                padding: '16px', background: 'rgba(255,255,255,0.03)', color: '#e2e8f0', 
+                                border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px',
+                                outline: 'none', resize: 'vertical'
+                            }}
+                            placeholder={`{\n  "metadata": {\n    "exemplo1": "novoConteúdo"\n  }\n}`}
+                            value={jsonInput}
+                            onChange={(e) => setJsonInput(e.target.value)}
+                            onFocus={e => e.target.style.borderColor = '#3b82f6'}
+                            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
+                            <button 
+                                type="button" 
+                                onClick={() => setIsJsonModalOpen(false)}
+                                style={{ padding: '12px 24px', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 600, cursor: 'pointer' }}
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                type="button" 
+                                onClick={handleJsonMerge}
+                                style={{ padding: '12px 24px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)' }}
+                            >
+                                Mesclar JSON
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
             {/* SUCCESS MODAL */}
             {showSuccessModal && document.body && createPortal(
                 <div style={{

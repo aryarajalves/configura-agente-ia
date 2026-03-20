@@ -127,6 +127,14 @@ const Sidebar = ({ onLogout }) => {
                                         <div className="active-indicator"></div>
                                     </NavLink>
                                     <NavLink
+                                        to="/background-tasks"
+                                        className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                                    >
+                                        <span className="nav-icon">🕛</span>
+                                        <span className="nav-label">Processamentos</span>
+                                        <div className="active-indicator"></div>
+                                    </NavLink>
+                                    <NavLink
                                         to="/integrations"
                                         className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
                                     >

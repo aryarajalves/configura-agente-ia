@@ -338,9 +338,12 @@ app.add_middleware(
 async def ping():
     return {"status": "ok", "message": "Backend is reachable"}
 
+from background_tasks import router as background_tasks_router
+
 app.include_router(import_router)
 app.include_router(prompt_lab_router)
 app.include_router(analysis_router)
+app.include_router(background_tasks_router)
 
 # Servir arquivos do Widget (JS e CSS)
 app.mount("/static", StaticFiles(directory="widget"), name="static")
@@ -1237,6 +1240,65 @@ async def process_transcription_endpoint(
     except Exception as e:
         logger.error(f"Erro ao processar RAG de transcrição: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro no processamento: {str(e)}")
+
+@app.post("/knowledge-bases/{kb_id}/video-background", dependencies=[Depends(verify_api_key)])
+async def process_media_background_endpoint(
+    kb_id: int,
+    file: UploadFile = File(...),
+    config: str = Form("{}"),
+    is_media: str = Form("true"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Inicia o processamento de arquivo de mídia ou texto em background para uma base de conhecimento.
+    """
+    import tempfile
+    import os
+    import json
+    from models import BackgroundProcessLog
+    
+    try:
+        config_dict = json.loads(config)
+        is_media_bool = is_media.lower() == "true"
+        
+        suffix = os.path.splitext(file.filename)[1]
+        # Define o diretório para temporários como dentro de /app para ser compartilhado via volume entre containers
+        os.makedirs("/app/temp_files", exist_ok=True)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, dir="/app/temp_files") as tmp:
+            content = await file.read()
+            tmp.write(content)
+            file_path = tmp.name
+            
+        log = BackgroundProcessLog(
+            process_name=f"Processamento de Arquivo ({file.filename})",
+            status="PENDENTE",
+            details={"kb_id": kb_id, "file_path": file_path, "is_media": is_media_bool}
+        )
+        db.add(log)
+        await db.commit()
+        await db.refresh(log)
+        
+        payload = {
+            "file_path": file_path,
+            "is_media": is_media_bool,
+            "options": config_dict,
+            "metadata_val": config_dict.get("metadata", "")
+        }
+        
+        from tasks import process_kb_media_task
+        task = process_kb_media_task.delay(log.id, kb_id, payload)
+        
+        log.task_id = task.id
+        await db.commit()
+        
+        return {
+            "message": "Processamento iniciado com sucesso em background.",
+            "log_id": log.id
+        }
+        
+    except Exception as e:
+        logger.error(f"Erro ao iniciar background de mídia: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/knowledge-bases/analyze-file", dependencies=[Depends(verify_api_key)])
 async def analyze_kb_file(file: UploadFile = File(...)):

@@ -17,7 +17,7 @@ RUN npm install
 COPY . .
 
 # Garante que o entrypoint seja executado para gerar o config.js em dev
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["sh", "/entrypoint.sh"]
 
 # -------------------------------------------------------------
 # ESTÁGIO 2: Desenvolvimento (Modo Interativo com Hot Reload)
@@ -57,5 +57,5 @@ RUN chmod +x /entrypoint.sh
 
 EXPOSE 80
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["sh", "/entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]

@@ -18,6 +18,7 @@ import UserManagement from './components/UserManagement';
 import SupportDashboard from './components/SupportDashboard';
 import PublicSupportView from './components/PublicSupportView';
 import PublicQuestionsView from './components/PublicQuestionsView';
+import BackgroundTasks from './components/BackgroundTasks';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('admin_token'));
@@ -68,6 +69,7 @@ function App() {
                         <Route path="/financeiro" element={<Financeiro />} />
                         <Route path="/fine-tuning" element={<FineTuning />} />
                         <Route path="/integrations" element={<IntegrationsPanel />} />
+                        <Route path="/background-tasks" element={<BackgroundTasks />} />
                       </>
                     )}
 

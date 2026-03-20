@@ -1,7 +1,7 @@
 #!/bin/sh
 
-# Função para ler segredo ou variável de ambiente
-# Prioridade: /run/secrets/NOME > Variável de Ambiente NOME
+# FunÃ§Ã£o para ler segredo ou variÃ¡vel de ambiente
+# Prioridade: /run/secrets/NOME > VariÃ¡vel de Ambiente NOME
 get_value() {
     var_name=$1
     if [ -f "/run/secrets/$var_name" ]; then
@@ -11,13 +11,13 @@ get_value() {
     fi
 }
 
-# Determina o diretório de saída
+# Determina o diretÃ³rio de saÃ­da
 if [ -d "/usr/share/nginx/html" ]; then
-    # Produção (Nginx)
+    # ProduÃ§Ã£o (Nginx)
     CONFIG_DIR="/usr/share/nginx/html"
 else
     # Desenvolvimento (Vite - geralmente montado em /app)
-    # Se a pasta public existir, salva nela, senão na raiz
+    # Se a pasta public existir, salva nela, senÃ£o na raiz
     if [ -d "/app/public" ]; then
         CONFIG_DIR="/app/public"
     else
@@ -43,7 +43,7 @@ echo "  VITE_API_URL: \"${API_URL}\"," >> $CONFIG_FILE
 echo "  VITE_AGENT_API_KEY: \"${AGENT_API_KEY}\"" >> $CONFIG_FILE
 echo "};" >> $CONFIG_FILE
 
-echo "Arquivo config.js gerado com as seguintes variáveis (valores ocultos por segurança):"
+echo "Arquivo config.js gerado com as seguintes variÃ¡veis (valores ocultos por seguranÃ§a):"
 echo "VITE_API_URL detectado: ${API_URL}"
 
 # Inicia o Nginx (comando original do container)

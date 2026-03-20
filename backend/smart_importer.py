@@ -8,6 +8,7 @@ import json
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+from config_store import get_real_model_id, MODEL_INFO
 import re
 
 load_dotenv()
@@ -396,7 +397,6 @@ async def generate_qa_from_text(text_chunk: str, num_questions: int = 2, model: 
     Returns (qa_list, usage_dict)
     """
     from agent import get_openai_client
-    from config_store import get_real_model_id
     
     # Resolve family name to real API ID
     api_model = get_real_model_id(model)
@@ -428,7 +428,7 @@ async def generate_qa_from_text(text_chunk: str, num_questions: int = 2, model: 
     try:
         print(f"DEBUG AI: Calling {api_model} (family: {model}) for Chunk QA...")
         
-        from config_store import MODEL_INFO
+        
         model_config = MODEL_INFO.get(model, {})
         supports_temp = model_config.get("supports_temperature", True)
         is_o1_model = api_model.startswith("o1") or not supports_temp
@@ -478,7 +478,6 @@ async def generate_global_qa(full_text: str, total_questions: int = 10, user_sug
     """
     Orchestrator for global QA extraction. Resolves model, manages text limit, and handles retries.
     """
-    from config_store import get_real_model_id
     
     try:
         api_model = get_real_model_id(model)
@@ -518,7 +517,6 @@ async def generate_global_qa(full_text: str, total_questions: int = 10, user_sug
 async def _call_global_qa_api(text: str, count: int, suggestions: str, ext_type: str, api_model: str, family: str):
     """Internal helper to call the LLM and parse JSON."""
     from agent import get_openai_client
-    from config_store import MODEL_INFO
     
     client = get_openai_client(api_model)
     if not client:
