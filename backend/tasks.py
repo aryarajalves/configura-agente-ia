@@ -115,7 +115,7 @@ def process_video_task(self, log_id: int, payload: dict):
 
                     # Chunks Extration
                     if options.get("extrair_chunks"):
-                        chunks = chunk_text(text_transcribed, chunk_size=1200, overlap=150)
+                        chunks = chunk_text(text_transcribed, chunk_size=1500, overlap=150)
                         for i, chunk in enumerate(chunks):
                             items_to_add.append(KnowledgeItemModel(
                                 knowledge_base_id=kb_id,
@@ -290,7 +290,7 @@ def process_kb_media_task(self, log_id: int, kb_id: int, payload: dict):
 
                     # Chunks Extration
                     if options.get("extractChunks"):
-                        c_size = options.get("chunkSize", 1200)
+                        c_size = options.get("chunkSize", 1500)
                         c_overlap = options.get("chunkOverlap", 150)
                         chunks = chunk_text(text_transcribed, chunk_size=c_size, overlap=c_overlap)
                         for i, chunk in enumerate(chunks):
@@ -366,13 +366,120 @@ def process_kb_media_task(self, log_id: int, kb_id: int, payload: dict):
 
 
 
-@app.task
-def delete_old_process_logs_task():
+@app.task(bind=True, queue='json_processing')
+def process_kb_json_item_task(self, log_id: int, kb_id: int, payload: dict):
     """
-    Tarefa recorrente agendada (Cron) para deletar os logs mais antigos do que 1 mês automaticamente.
+    Task para processamento de um item individual vindo de um upload JSON em lote.
     """
-    try:
-        deleted_count = asyncio.run(_delete_old_logs(days=30))
-        logger.info(f"Limpeza de logs finalizada. {deleted_count} logs antigos removidos.")
-    except Exception as e:
-        logger.error(f"Erro ao limpar logs antigos: {str(e)}")
+    async def _async_logic():
+        try:
+            text_content = payload.get("context", "")
+            metadata_val = payload.get("metadata", "")
+            if isinstance(metadata_val, list):
+                metadata_val = " | ".join(map(str, metadata_val))
+            elif isinstance(metadata_val, dict):
+                import json
+                metadata_val = json.dumps(metadata_val)
+            else:
+                metadata_val = str(metadata_val) if metadata_val else ""
+            
+            options = payload.get("options", {})
+            
+            await _update_log_status(log_id, "PROCESSANDO", 5, details_update={"task_id": self.request.id})
+
+            if not text_content.strip():
+                await _update_log_status(log_id, "ERRO", 0, error_message="Conteúdo vazio para este item.")
+                return
+
+            # Processamento RAG
+            async with async_session() as db:
+                items_to_add = []
+                
+                # Q&A Extração
+                if options.get("extractQA"):
+                    num_q = max(3, min(15, len(text_content) // 500))
+                    qa_list, _ = await generate_global_qa(text_content, total_questions=num_q)
+                    if qa_list:
+                        for item in qa_list:
+                            items_to_add.append(KnowledgeItemModel(
+                                knowledge_base_id=kb_id,
+                                question=item.get("pergunta", "Questão extraída"),
+                                answer=item.get("resposta", ""),
+                                metadata_val=f"{metadata_val} | Source: Q&A (JSON)",
+                                category="JSON Import"
+                            ))
+                
+                # Resumo
+                if options.get("generateSummary"):
+                    try:
+                        from agent import get_openai_client
+                        client = get_openai_client()
+                        if client:
+                            response = await client.chat.completions.create(
+                                model="gpt-4o-mini",
+                                messages=[
+                                    {"role": "system", "content": "Você é um assistente especialista em síntese de informações. Resuma o texto fornecido em pontos principais (bullet points) de forma executiva e clara."},
+                                    {"role": "user", "content": f"Texto para resumir:\n\n{text_content}"}
+                                ],
+                                temperature=0.5
+                            )
+                            summary_text = response.choices[0].message.content
+                            items_to_add.append(KnowledgeItemModel(
+                                knowledge_base_id=kb_id,
+                                question=f"Resumo - {metadata_val}" if metadata_val else "Resumo de Item JSON",
+                                answer=summary_text,
+                                metadata_val=f"{metadata_val} | Source: Resumo (JSON)",
+                                category="Resumo"
+                            ))
+                    except Exception as e:
+                        logger.error(f"Erro no resumo JSON task: {e}")
+
+                # Chunks
+                if options.get("extractChunks"):
+                    c_size = options.get("chunkSize", 1500)
+                    c_overlap = options.get("chunkOverlap", 150)
+                    chunks = chunk_text(text_content, chunk_size=c_size, overlap=c_overlap)
+                    for i, chunk in enumerate(chunks):
+                        items_to_add.append(KnowledgeItemModel(
+                            knowledge_base_id=kb_id,
+                            question=f"Trecho {i+1} - {metadata_val}" if metadata_val else f"Trecho {i+1}",
+                            answer=chunk["text"],
+                            metadata_val=f"{metadata_val} | Source: Chunk (JSON)",
+                            category="Chunking"
+                        ))
+
+                if not items_to_add:
+                    items_to_add.append(KnowledgeItemModel(
+                        knowledge_base_id=kb_id,
+                        question=f"Conteúdo de {metadata_val}" if metadata_val else "Conteúdo JSON",
+                        answer=text_content,
+                        metadata_val=metadata_val,
+                        category="Upload JSON"
+                    ))
+
+                db.add_all(items_to_add)
+                await db.commit()
+                
+                # Embeddings
+                total_items = len(items_to_add)
+                for i in range(0, total_items, 50):
+                    batch = items_to_add[i:i+50]
+                    batch_texts = [f"{item.metadata_val} | {item.question} | {item.answer}" for item in batch]
+                    embeddings, _ = await get_batch_embeddings(batch_texts)
+                    for j, item in enumerate(batch):
+                        if embeddings and j < len(embeddings):
+                            item.embedding = embeddings[j]
+                    await db.commit()
+                    await _update_log_status(log_id, "PROCESSANDO", 60 + int(((i + len(batch)) / total_items) * 35))
+
+                await db.commit()
+                await _update_log_status(log_id, "CONCLUIDO", 100, details_update={"items_generated": total_items})
+                return total_items
+
+        except Exception as e:
+            logger.error(f"Erro no process_kb_json_item_task {log_id}: {str(e)}")
+            await _update_log_status(log_id, "ERRO", 0, error_message=str(e))
+        finally:
+            await engine.dispose()
+
+    asyncio.run(_async_logic())

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Security, Request, Response
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Security, Request, Response, Body
 from fastapi.security.api_key import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -1201,7 +1201,7 @@ async def process_transcription_endpoint(
         
         # 2. Extração de Chunks (Conhecimento Puro)
         if config.get("extractChunks"):
-            c_size = config.get("chunkSize", 1200)
+            c_size = config.get("chunkSize", 1500)
             c_overlap = config.get("chunkOverlap", 150)
             chunks = chunk_text(text, chunk_size=c_size, overlap=c_overlap)
             for i, chunk in enumerate(chunks):
@@ -1406,6 +1406,66 @@ async def analyze_kb_text(text: str = Form(...)):
         "is_image": False,
         "is_structured": True
     }
+
+@app.post("/knowledge-bases/{kb_id}/process-json-batch", dependencies=[Depends(verify_api_key)])
+async def process_json_batch_endpoint(
+    kb_id: int,
+    data: list = Body(...),
+    global_config: dict = Body({}),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Processa um lote de itens JSON, disparando uma tarefa de background para cada um.
+    """
+    from models import BackgroundProcessLog
+    from tasks import process_kb_json_item_task
+    
+    try:
+        logs_started = []
+        for item in data:
+            # Merge item config with global config
+            # Priority: item-specific > global
+            item_options = {
+                "extractQA": item.get("generate_questions", global_config.get("extractQA", True)),
+                "generateSummary": item.get("generate_resume", global_config.get("generateSummary", False)),
+                "extractChunks": item.get("configure_chuncks", global_config.get("extractChunks", False)),
+                "chunkSize": item.get("chunks_configs", {}).get("Chars", item.get("chunks_configs", {}).get("Chars_", global_config.get("chunkSize", 1500))),
+                "chunkOverlap": item.get("chunks_configs", {}).get("Overlay", global_config.get("chunkOverlap", 150))
+            }
+            
+            # Metadata merge: if item has metadata list, use it. Otherwise use global.
+            item_metadata = item.get("metadata", global_config.get("metadata", ""))
+
+            log = BackgroundProcessLog(
+                process_name=f"Importação JSON: {item.get('context', '')[:50]}...",
+                status="PENDENTE",
+                details={"kb_id": kb_id, "options": item_options}
+            )
+            db.add(log)
+            await db.commit()
+            await db.refresh(log)
+            
+            payload = {
+                "context": item.get("context", ""),
+                "metadata": item_metadata,
+                "options": item_options
+            }
+            
+            task = process_kb_json_item_task.delay(log.id, kb_id, payload)
+            
+            log.task_id = task.id
+            logs_started.append(log.id)
+            
+        await db.commit()
+        
+        return {
+            "message": f"{len(logs_started)} processos iniciados em background.",
+            "log_ids": logs_started
+        }
+        
+    except Exception as e:
+        logger.error(f"Erro ao iniciar processamento de lote JSON: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/knowledge-bases/{kb_id}/import-mapped", dependencies=[Depends(verify_api_key)])
 async def import_mapped_file(
