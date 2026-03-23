@@ -13,7 +13,7 @@ def transcribe_video(file_path: str, config_params: dict = None) -> dict:
     
     # Mapeia as configurações recebidas para o objeto TranscriptionConfig do AssemblyAI
     trans_config = aai.TranscriptionConfig(
-        speech_models=["universal-2"],
+        speech_model="best",
         language_detection=config_params.get("autoLanguage", True) if config_params else True,
         language_code=config_params.get("language", "pt") if config_params and not config_params.get("autoLanguage") else None,
         speaker_labels=config_params.get("speakerLabels", False) if config_params else False,

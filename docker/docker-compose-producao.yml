@@ -1,49 +1,123 @@
 version: '3.8'
 
-# ============================================================
-# PRODUCAO — Docker Swarm + Traefik
-# Banco de dados externo (já existe no servidor).
-#
-# Subir:
-#   docker stack deploy -c docker-compose-producao.yml agentes
-#
-# Remover:
-#   docker stack rm agentes
-# ============================================================
-
 services:
 
-  # ----------------------------------------------------------
-  # BACKEND — FastAPI + Gunicorn
-  # ----------------------------------------------------------
-  backend:
-    image: aryarajalves/configurar-agentes-ia:1.1.1-backend
+  celery_beat:
+    image: aryarajalves/configurar-agentes-ia:1.1.9-backend
     hostname: "{{.Service.Name}}.{{.Task.Slot}}"
     networks:
       - network_swarm_public
     environment:
-      # --- Banco de Dados e Concorrência ---
-      - DATABASE_URL=${DATABASE_URL} # URL de conexão ao PostgreSQL (Externo)
-      - GUNICORN_WORKERS=${GUNICORN_WORKERS:-5} # Ajustado para 5 workers (Ideal para 2 CPUs)
+      - DATABASE_URL=${DATABASE_URL}
+      - GUNICORN_WORKERS=4
+      - FRONTEND_URL=https://agentefrontlucas.agency10x.com.br
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ASSEMBLYAI_API_KEY=${ASSEMBLYAI_API_KEY}
+      - AGENT_API_KEY=${AGENT_API_KEY}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - CORS_ALLOWED_ORIGINS=https://agentefrontlucas.agency10x.com.br
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - S3_ENABLED=True
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - S3_REGION=${S3_REGION}
+    command: ["celery", "-A", "celery_app", "beat", "--loglevel=info"]
+    deploy:
+      mode: replicated
+      replicas: 1
 
-      # --- Integrações com IA ---
-      - OPENAI_API_KEY=${OPENAI_API_KEY} # Chave para geração de texto (GPT) e embeddings (OpenAI)
-      - GEMINI_API_KEY=${GEMINI_API_KEY} # Chave para modelos Google Gemini (Alternativo)
+  celery_worker_json:
+    image: aryarajalves/configurar-agentes-ia:1.1.9-backend
+    hostname: "{{.Service.Name}}.{{.Task.Slot}}"
+    networks:
+      - network_swarm_public
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - GUNICORN_WORKERS=4
+      - FRONTEND_URL=https://agentefrontlucas.agency10x.com.br
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ASSEMBLYAI_API_KEY=${ASSEMBLYAI_API_KEY}
+      - AGENT_API_KEY=${AGENT_API_KEY}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - CORS_ALLOWED_ORIGINS=https://agentefrontlucas.agency10x.com.br
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - S3_ENABLED=True
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - S3_REGION=${S3_REGION}
+    command: ["celery", "-A", "celery_app", "worker", "--loglevel=info", "-Q", "json_processing", "-c", "1"]
+    deploy:
+      mode: replicated
+      replicas: 1
+      resources:
+        limits:
+          cpus: "1"
+          memory: 2048M
 
-      # --- Segurança Padrão (APIs Públicas) ---
-      - AGENT_API_KEY=${AGENT_API_KEY} # Senha master da API. Usada pelo N8N, Chat e Webhooks para usar o endpoint /execute.
+  celery_worker:
+    image: aryarajalves/configurar-agentes-ia:1.1.9-backend
+    hostname: "{{.Service.Name}}.{{.Task.Slot}}"
+    networks:
+      - network_swarm_public
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - GUNICORN_WORKERS=4
+      - FRONTEND_URL=https://agentefrontlucas.agency10x.com.br
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ASSEMBLYAI_API_KEY=${ASSEMBLYAI_API_KEY}
+      - AGENT_API_KEY=${AGENT_API_KEY}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - CORS_ALLOWED_ORIGINS=https://agentefrontlucas.agency10x.com.br
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - S3_ENABLED=True
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - S3_REGION=${S3_REGION}
+    command: ["celery", "-A", "celery_app", "worker", "--loglevel=info", "-Q", "celery"]
+    deploy:
+      mode: replicated
+      replicas: 1
+      resources:
+        limits:
+          cpus: "1"
+          memory: 4096M
 
-      # --- Segurança de Painel de Administração e Sessão (Obrigatório) ---
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY} # Assinatura criptográfica dos tokens de Login. Mantém administradores logados de forma segura.
-      - ADMIN_EMAIL=${ADMIN_EMAIL} # E-mail do usuário Super Administrador do painel
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD} # Senha do usuário Super Administrador
-      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS} # Proteção do navegador. Lista de domínios (ex: https://meusite.com) autorizados a se comunicar.
-
-      # --- Google Calendar (Opcional) ---
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID} # ID da credencial OAuth do painel Google Cloud
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET} # Secret da credencial OAuth
-      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI} # URL de retorno exata após o usuário fazer login no Google
-
+  backend:
+    image: aryarajalves/configurar-agentes-ia:1.1.9-backend
+    hostname: "{{.Service.Name}}.{{.Task.Slot}}"
+    networks:
+      - network_swarm_public
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - GUNICORN_WORKERS=4
+      - GUNICORN_TIMEOUT=3600
+      - FRONTEND_URL=https://agentefrontlucas.agency10x.com.br
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ASSEMBLYAI_API_KEY=${ASSEMBLYAI_API_KEY}
+      - AGENT_API_KEY=${AGENT_API_KEY}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - CORS_ALLOWED_ORIGINS=https://agentefrontlucas.agency10x.com.br
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - S3_ENABLED=True
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - S3_REGION=${S3_REGION}
     deploy:
       mode: replicated
       replicas: 1
@@ -52,11 +126,11 @@ services:
           - node.role == manager
       resources:
         limits:
-          cpus: "1"
-          memory: 1024M
+          cpus: "2"
+          memory: 4096M
       labels:
         - traefik.enable=true
-        - traefik.http.routers.agentes_backend.rule=Host(`${DOMAIN_BACKEND}`)
+        - traefik.http.routers.agentes_backend.rule=Host(`agentebacklucas.agency10x.com.br`)
         - traefik.http.routers.agentes_backend.entrypoints=websecure
         - traefik.http.routers.agentes_backend.tls.certresolver=letsencryptresolver
         - traefik.http.routers.agentes_backend.service=agentes_backend
@@ -65,19 +139,16 @@ services:
         - traefik.http.middlewares.sslheader.headers.customrequestheaders.X-Forwarded-Proto=https
         - traefik.http.routers.agentes_backend.middlewares=sslheader@docker
 
-  # ----------------------------------------------------------
-  # FRONTEND — React (build estático) + Nginx
-  # ----------------------------------------------------------
   frontend:
-    image: aryarajalves/configurar-agentes-ia:1.1.1-frontend
+    image: aryarajalves/configurar-agentes-ia:1.1.9-frontend
     hostname: "{{.Service.Name}}.{{.Task.Slot}}"
     networks:
       - network_swarm_public
     secrets:
       - source: VITE_API_URL
-        target: VITE_API_URL # Informa ao frontend estático onde o backend está hospedado
+        target: VITE_API_URL
       - source: VITE_AGENT_API_KEY
-        target: VITE_AGENT_API_KEY # Chave API injetada no código do site
+        target: VITE_AGENT_API_KEY
     deploy:
       mode: replicated
       replicas: 1
@@ -87,10 +158,10 @@ services:
       resources:
         limits:
           cpus: "0.5"
-          memory: 256M
+          memory: 512M
       labels:
         - traefik.enable=true
-        - traefik.http.routers.agentes_frontend.rule=Host(`${DOMAIN_FRONTEND}`)
+        - traefik.http.routers.agentes_frontend.rule=Host(`agentefrontlucas.agency10x.com.br`)
         - traefik.http.routers.agentes_frontend.entrypoints=websecure
         - traefik.http.routers.agentes_frontend.tls.certresolver=letsencryptresolver
         - traefik.http.routers.agentes_frontend.service=agentes_frontend

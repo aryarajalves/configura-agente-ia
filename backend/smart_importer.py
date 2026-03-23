@@ -128,7 +128,7 @@ async def extract_text_from_image_b64(base64_image: str) -> str:
         return ""
 
 
-async def render_page_as_image(file_bytes: bytes, page_num: int) -> str | None:
+async def render_page_as_image(file_input: Union[bytes, str], page_num: int) -> str | None:
     """
     Renders a PDF page to a base64 PNG image using pypdfium2 (already in requirements).
     Returns base64 string or None on error.
@@ -138,7 +138,7 @@ async def render_page_as_image(file_bytes: bytes, page_num: int) -> str | None:
         import io
         import base64
 
-        pdf = pdfium.PdfDocument(file_bytes)
+        pdf = pdfium.PdfDocument(file_input)
         if page_num < 1 or page_num > len(pdf):
             return None
         page = pdf[page_num - 1]
@@ -152,7 +152,7 @@ async def render_page_as_image(file_bytes: bytes, page_num: int) -> str | None:
         return None
 
 
-async def extract_visual_content_from_section(file_bytes: bytes, section: dict) -> str:
+async def extract_visual_content_from_section(file_input: Union[bytes, str], section: dict) -> str:
     """
     For pages in the section that have images/graphics (detected by pdfplumber),
     renders them via pypdfium2 and calls GPT-4o Vision to extract visual content.
@@ -163,7 +163,8 @@ async def extract_visual_content_from_section(file_bytes: bytes, section: dict) 
 
     visual_parts = []
     try:
-        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+        source = file_input if isinstance(file_input, str) else io.BytesIO(file_input)
+        with pdfplumber.open(source) as pdf:
             total_pages = len(pdf.pages)
             start = section.get("start_page", 1)
             end = section.get("end_page", total_pages)
@@ -171,7 +172,7 @@ async def extract_visual_content_from_section(file_bytes: bytes, section: dict) 
             for page_num in range(start, min(end + 1, total_pages + 1)):
                 page = pdf.pages[page_num - 1]
                 if page.images:
-                    b64 = await render_page_as_image(file_bytes, page_num)
+                    b64 = await render_page_as_image(file_input, page_num)
                     if b64:
                         content = await extract_text_from_image_b64(b64)
                         if content and content.strip():
@@ -245,13 +246,15 @@ def detect_sections(pages_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return sections
 
 
-async def extract_text_from_pdf(file_content: bytes, start_page: int = 1, end_page: int = None) -> List[Dict[str, Any]]:
+async def extract_text_from_pdf(file_input: Union[bytes, str], start_page: int = 1, end_page: int = None) -> List[Dict[str, Any]]:
     """
     Extracts text from a PDF file as a list of page objects with text and page number.
+    Support both bytes (legacy) and file path (streaming).
     """
     pages_data = []
     try:
-        with pdfplumber.open(io.BytesIO(file_content)) as pdf:
+        source = file_input if isinstance(file_input, str) else io.BytesIO(file_input)
+        with pdfplumber.open(source) as pdf:
             total_pages = len(pdf.pages)
             
             # Adjust range

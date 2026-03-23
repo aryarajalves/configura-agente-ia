@@ -55,9 +55,18 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
         extractQA: true,
         extractChunks: false,
         generateSummary: false,
-        chunkSize: 1200,
+        chunkSize: 1500,
         chunkOverlap: 150
     });
+
+    // Estados para Upload JSON em lote
+    const [isJsonBatchModalOpen, setIsJsonBatchModalOpen] = useState(false);
+    const [jsonBatchInput, setJsonBatchInput] = useState('');
+    const [jsonParsedData, setJsonParsedData] = useState(null);
+    const [showJsonConfirmModal, setShowJsonConfirmModal] = useState(false);
+    const [isGlobalConfigEnabled, setIsGlobalConfigEnabled] = useState(false);
+    const [isProcessingJsonBatch, setIsProcessingJsonBatch] = useState(false);
+    const [isUploadMode, setIsUploadMode] = useState(false); // false = texto, true = arquivo
     
     // Lista de metadados
     const [metadata, setMetadata] = useState([{ name: '', content: '' }]);
@@ -98,12 +107,55 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
     const [simResults, setSimResults] = useState(null);
     const [simLoading, setSimLoading] = useState(false);
     const [simConfig, setSimConfig] = useState({
-        translation: false,
+        threshold: 0.7,
+        limit: 5,
         multiQuery: false,
         rerank: true,
         agenticEval: true,
         parentExpansion: true
     });
+
+    const handleJsonBatchSubmit = async () => {
+        try {
+            const parsed = JSON.parse(jsonBatchInput);
+            if (!parsed.data || !Array.isArray(parsed.data)) {
+                alert("O JSON deve conter uma chave 'data' com um array de itens.");
+                return;
+            }
+            setJsonParsedData(parsed.data);
+            setIsJsonBatchModalOpen(false);
+            setShowJsonConfirmModal(true);
+        } catch (e) {
+            alert("JSON inválido: " + e.message);
+        }
+    };
+
+    const handleJsonFileChange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            setJsonBatchInput(event.target.result);
+        };
+        reader.readAsText(file);
+    };
+
+    const handleConfirmJsonBatch = async () => {
+        setIsProcessingJsonBatch(true);
+        try {
+            await api.post(`/knowledge-bases/${kbId}/process-json-batch`, {
+                data: jsonParsedData,
+                global_config: isGlobalConfigEnabled ? ragConfig : {}
+            });
+            setShowJsonConfirmModal(false);
+            setShowSuccessModal(true);
+        } catch (error) {
+            console.error(error);
+            alert("Erro ao processar: " + (error.response?.data?.detail || error.message));
+        } finally {
+            setIsProcessingJsonBatch(false);
+        }
+    };
 
     useEffect(() => {
         const fetchKbData = async () => {
@@ -720,6 +772,12 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                             <button onClick={handlePasteText} className="kb-quick-action-btn">📋 Colar Texto</button>
                             <button onClick={() => setShowMediaSelectionModal(true)} className="kb-quick-action-btn">
                                 📽️ Transcrição de Vídeo
+                            </button>
+                            <button onClick={() => {
+                                setJsonBatchInput('');
+                                setIsJsonBatchModalOpen(true);
+                            }} className="kb-quick-action-btn">
+                                📄 Upload Json
                             </button>
                             <button onClick={() => fileInputRef.current.click()} className="kb-quick-action-btn" disabled={uploading}>
                                 {uploading ? '🔄 Processando...' : '📄 Upload PDF/DOCX'}
@@ -3484,6 +3542,173 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                                 }}
                             >
                                 {isSummarizing ? 'Sintetizando...' : '✨ Gerar e Salvar Resumo'}
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+            {/* JSON BATCH IMPORT MODAL 1: INPUT */}
+            {isJsonBatchModalOpen && document.body && createPortal(
+                <div style={{
+                    position: 'fixed', inset: 0, background: 'rgba(7, 10, 20, 0.95)',
+                    backdropFilter: 'blur(20px)', zIndex: 100003, display: 'flex',
+                    alignItems: 'center', justifyContent: 'center', padding: '20px'
+                }}>
+                    <div className="fade-in" style={{
+                        background: '#0f172a', border: '1px solid rgba(16, 185, 129, 0.3)',
+                        borderRadius: '32px', width: '100%', maxWidth: '600px',
+                        padding: '40px', boxShadow: '0 30px 60px rgba(0,0,0,0.8)'
+                    }}>
+                        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                            <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📦</div>
+                            <h2 style={{ color: 'white', fontSize: '1.8rem', fontWeight: 900, marginBottom: '8px' }}>Importar Lote JSON</h2>
+                            <p style={{ color: '#94a3b8', fontSize: '0.95rem' }}>Adicione múltiplos itens de uma vez à sua base de conhecimento.</p>
+                        </div>
+
+                        <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '14px', padding: '6px', marginBottom: '24px' }}>
+                            <button 
+                                onClick={() => setIsUploadMode(false)}
+                                style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: !isUploadMode ? '#10b981' : 'transparent', color: 'white', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
+                            >Texto Escrito</button>
+                            <button 
+                                onClick={() => setIsUploadMode(true)}
+                                style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: isUploadMode ? '#10b981' : 'transparent', color: 'white', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
+                            >Upload de Arquivo</button>
+                        </div>
+
+                        {isUploadMode ? (
+                            <div style={{ 
+                                border: '2px dashed rgba(255,255,255,0.1)', borderRadius: '16px', padding: '40px', textAlign: 'center',
+                                background: 'rgba(255,255,255,0.02)', cursor: 'pointer'
+                            }} onClick={() => document.getElementById('json-file-input').click()}>
+                                <input id="json-file-input" type="file" accept=".json" onChange={handleJsonFileChange} style={{ display: 'none' }} />
+                                <div style={{ fontSize: '2rem', marginBottom: '12px' }}>📄</div>
+                                <p style={{ color: '#94a3b8', margin: 0 }}>{jsonBatchInput ? 'Arquivo carregado!' : 'Clique para selecionar o arquivo .json'}</p>
+                            </div>
+                        ) : (
+                            <textarea
+                                value={jsonBatchInput}
+                                onChange={e => setJsonBatchInput(e.target.value)}
+                                placeholder='{ "data": [ { "context": "...", "metadata": ["cat1"], "generate_questions": true } ] }'
+                                style={{ 
+                                    width: '100%', height: '250px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)',
+                                    borderRadius: '16px', padding: '16px', color: 'white', fontFamily: 'monospace', outline: 'none', resize: 'none'
+                                }}
+                            />
+                        )}
+
+                        <div style={{ display: 'flex', gap: '16px', marginTop: '32px' }}>
+                            <button 
+                                onClick={() => setIsJsonBatchModalOpen(false)}
+                                style={{ flex: 1, padding: '16px', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none', borderRadius: '16px', fontWeight: 700, cursor: 'pointer' }}
+                            >Cancelar</button>
+                            <button 
+                                onClick={handleJsonBatchSubmit}
+                                disabled={!jsonBatchInput.trim()}
+                                style={{ 
+                                    flex: 2, padding: '16px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                    color: 'white', border: 'none', borderRadius: '16px', fontWeight: 900, cursor: 'pointer',
+                                    boxShadow: '0 10px 25px rgba(16, 185, 129, 0.4)', opacity: !jsonBatchInput.trim() ? 0.5 : 1
+                                }}
+                            >Continuar</button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* JSON BATCH CONFIRMATION MODAL 2 */}
+            {showJsonConfirmModal && document.body && createPortal(
+                <div style={{
+                    position: 'fixed', inset: 0, background: 'rgba(7, 10, 20, 0.95)',
+                    backdropFilter: 'blur(20px)', zIndex: 100004, display: 'flex',
+                    alignItems: 'center', justifyContent: 'center', padding: '20px'
+                }}>
+                    <div className="fade-in" style={{
+                        background: '#0f172a', border: '1px solid rgba(99, 102, 241, 0.3)',
+                        borderRadius: '32px', width: '100%', maxWidth: '650px',
+                        padding: '40px', boxShadow: '0 30px 60px rgba(0,0,0,0.8)',
+                        maxHeight: '90vh', overflowY: 'auto'
+                    }}>
+                        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+                            <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🔍</div>
+                            <h2 style={{ color: 'white', fontSize: '1.8rem', fontWeight: 900, marginBottom: '8px' }}>Confirmar Importação</h2>
+                            <p style={{ color: '#94a3b8', fontSize: '1.1rem' }}>Identificamos <strong>{jsonParsedData?.length || 0}</strong> itens para processar.</p>
+                        </div>
+
+                        <div style={{ background: 'rgba(99, 102, 241, 0.05)', border: '1px solid rgba(99, 102, 241, 0.2)', borderRadius: '20px', padding: '24px', marginBottom: '32px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isGlobalConfigEnabled ? '20px' : 0 }}>
+                                <div>
+                                    <h4 style={{ color: 'white', margin: 0, fontSize: '1rem', fontWeight: 800 }}>Configurações Globais</h4>
+                                    <p style={{ color: '#94a3b8', margin: '4px 0 0 0', fontSize: '0.8rem' }}>Aplicar as mesmas regras para todos os itens.</p>
+                                </div>
+                                <button 
+                                    onClick={() => setIsGlobalConfigEnabled(!isGlobalConfigEnabled)}
+                                    style={{ 
+                                        padding: '10px 20px', borderRadius: '12px', border: 'none', 
+                                        background: isGlobalConfigEnabled ? '#6366f1' : 'rgba(255,255,255,0.05)', 
+                                        color: 'white', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s'
+                                    }}
+                                >{isGlobalConfigEnabled ? 'Ativado' : 'Ativar'}</button>
+                            </div>
+
+                            {isGlobalConfigEnabled && (
+                                <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '20px' }}>
+                                    {/* Simplified RAG Config UI */}
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                                        <div onClick={() => setRagConfig(p => ({...p, extractQA: !p.extractQA}))} style={{ flex: '1 1 140px', padding: '12px', borderRadius: '12px', background: ragConfig.extractQA ? 'rgba(16, 185, 129, 0.15)' : 'rgba(0,0,0,0.2)', border: `1px solid ${ragConfig.extractQA ? '#10b981' : 'transparent'}`, cursor: 'pointer', textAlign: 'center' }}>
+                                            <div style={{ fontSize: '1.2rem' }}>❓</div>
+                                            <div style={{ color: 'white', fontSize: '0.75rem', fontWeight: 800, marginTop: '4px' }}>Perguntas</div>
+                                        </div>
+                                        <div onClick={() => setRagConfig(p => ({...p, generateSummary: !p.generateSummary}))} style={{ flex: '1 1 140px', padding: '12px', borderRadius: '12px', background: ragConfig.generateSummary ? 'rgba(59, 130, 246, 0.15)' : 'rgba(0,0,0,0.2)', border: `1px solid ${ragConfig.generateSummary ? '#3b82f6' : 'transparent'}`, cursor: 'pointer', textAlign: 'center' }}>
+                                            <div style={{ fontSize: '1.2rem' }}>📄</div>
+                                            <div style={{ color: 'white', fontSize: '0.75rem', fontWeight: 800, marginTop: '4px' }}>Resumo IA</div>
+                                        </div>
+                                        <div onClick={() => setRagConfig(p => ({...p, extractChunks: !p.extractChunks}))} style={{ flex: '1 1 140px', padding: '12px', borderRadius: '12px', background: ragConfig.extractChunks ? 'rgba(79, 70, 229, 0.15)' : 'rgba(0,0,0,0.2)', border: `1px solid ${ragConfig.extractChunks ? '#6366f1' : 'transparent'}`, cursor: 'pointer', textAlign: 'center' }}>
+                                            <div style={{ fontSize: '1.2rem' }}>🧩</div>
+                                            <div style={{ color: 'white', fontSize: '0.75rem', fontWeight: 800, marginTop: '4px' }}>Chunks</div>
+                                        </div>
+                                    </div>
+                                    {ragConfig.extractChunks && (
+                                        <div style={{ marginTop: '10px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                            <div>
+                                                <label style={{ color: '#94a3b8', fontSize: '0.65rem', fontWeight: 800 }}>TAMANHO (CHARS)</label>
+                                                <input type="number" value={ragConfig.chunkSize} onChange={e => setRagConfig(p => ({...p, chunkSize: parseInt(e.target.value)}))} style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '8px', color: 'white', marginTop: '4px' }} />
+                                            </div>
+                                            <div>
+                                                <label style={{ color: '#94a3b8', fontSize: '0.65rem', fontWeight: 800 }}>OVERLAY</label>
+                                                <input type="number" value={ragConfig.chunkOverlap} onChange={e => setRagConfig(p => ({...p, chunkOverlap: parseInt(e.target.value)}))} style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '8px', color: 'white', marginTop: '4px' }} />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '16px' }}>
+                            <button 
+                                onClick={() => setShowJsonConfirmModal(false)}
+                                style={{ flex: 1, padding: '16px', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none', borderRadius: '16px', fontWeight: 700, cursor: 'pointer' }}
+                            >Voltar</button>
+                            <button 
+                                onClick={handleConfirmJsonBatch}
+                                disabled={isProcessingJsonBatch}
+                                style={{ 
+                                    flex: 2, padding: '16px', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                                    color: 'white', border: 'none', borderRadius: '16px', fontWeight: 900, cursor: 'pointer',
+                                    boxShadow: '0 10px 25px rgba(99, 102, 241, 0.4)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
+                                }}
+                            >
+                                {isProcessingJsonBatch ? (
+                                    <>
+                                        <div className="spin" style={{ width: '20px', height: '20px', border: '3px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%' }}></div>
+                                        Iniciando...
+                                    </>
+                                ) : (
+                                    <>🚀 Processar Todos os Arquivos</>
+                                )}
                             </button>
                         </div>
                     </div>

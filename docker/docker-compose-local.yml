@@ -61,7 +61,25 @@ services:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-ai_agent_db}
       - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
       - PYTHONUNBUFFERED=1
-    command: celery -A celery_app worker --loglevel=info
+    command: celery -A celery_app worker --loglevel=info -Q celery
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  celery_worker_json:
+    build: ../backend
+    container_name: celery-worker-json-agente-local
+    env_file:
+      - ../.env
+    volumes:
+      - ../backend:/app
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-ai_agent_db}
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+      - PYTHONUNBUFFERED=1
+    command: celery -A celery_app worker --loglevel=info -Q json_processing -c 1
     depends_on:
       db:
         condition: service_healthy
