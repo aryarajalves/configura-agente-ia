@@ -22,7 +22,10 @@ import logging
 import asyncio
 from router_import import router as import_router
 from transcription_service import transcribe_video
+from services.s3_service import s3_service
 import tempfile
+import uuid
+import shutil
 import tiktoken
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -1252,43 +1255,73 @@ async def process_media_background_endpoint(
     """
     Inicia o processamento de arquivo de mídia ou texto em background para uma base de conhecimento.
     """
-    import tempfile
-    import os
-    import json
     from models import BackgroundProcessLog
+    from tasks import process_kb_media_task
     
     try:
         config_dict = json.loads(config)
         is_media_bool = is_media.lower() == "true"
-        
         suffix = os.path.splitext(file.filename)[1]
-        # Define o diretório para temporários como dentro de /app para ser compartilhado via volume entre containers
-        os.makedirs("/app/temp_files", exist_ok=True)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, dir="/app/temp_files") as tmp:
-            content = await file.read()
-            tmp.write(content)
-            file_path = tmp.name
-            
+        
+        # Cria o log inicial no banco
         log = BackgroundProcessLog(
             process_name=f"Processamento de Arquivo ({file.filename})",
             status="PENDENTE",
-            details={"kb_id": kb_id, "file_path": file_path, "is_media": is_media_bool}
+            details={"kb_id": kb_id, "is_media": is_media_bool}
         )
         db.add(log)
         await db.commit()
         await db.refresh(log)
+
+        file_path = ""
         
+        # Se S3 estiver habilitado, faz upload via streaming
+        if s3_service.enabled:
+            s3_key = f"kb/{kb_id}/{uuid.uuid4()}{suffix}"
+            os.makedirs("/app/temp_files", exist_ok=True)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, dir="/app/temp_files") as tmp:
+                while True:
+                    chunk = await file.read(1024 * 1024)  # 1MB
+                    if not chunk:
+                        break
+                    tmp.write(chunk)
+                tmp_path = tmp.name
+            
+            try:
+                with open(tmp_path, 'rb') as f:
+                    s3_service.upload_fileobj(f, s3_key, content_type=file.content_type)
+                file_path = s3_key
+                logger.info(f"Arquivo enviado para o S3: {s3_key}")
+            finally:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+        else:
+            # Fallback para local
+            os.makedirs("/app/temp_files", exist_ok=True)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, dir="/app/temp_files") as tmp:
+                while True:
+                    chunk = await file.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    tmp.write(chunk)
+                file_path = tmp.name
+                logger.info(f"Arquivo salvo localmente: {file_path}")
+
+        # Prepara o payload para a tarefa
         payload = {
             "file_path": file_path,
             "is_media": is_media_bool,
             "options": config_dict,
-            "metadata_val": config_dict.get("metadata", "")
+            "metadata_val": config_dict.get("metadata", ""),
+            "original_filename": file.filename
         }
         
-        from tasks import process_kb_media_task
+        # Dispara a tarefa
         task = process_kb_media_task.delay(log.id, kb_id, payload)
         
         log.task_id = task.id
+        log.details["file_path"] = file_path
+        db.add(log)
         await db.commit()
         
         return {
@@ -1304,22 +1337,37 @@ async def process_media_background_endpoint(
 async def analyze_kb_file(file: UploadFile = File(...)):
     import pandas as pd
     import io
-    content = await file.read()
+    # Refatorado: Usa arquivo temporário para não carrergar tudo na RAM
+    suffix = os.path.splitext(file.filename)[1]
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk:
+                break
+            tmp.write(chunk)
+        tmp_path = tmp.name
+
     filename = file.filename.lower()
     
     try:
         if filename.endswith(".csv"):
-            df = pd.read_csv(io.BytesIO(content))
+            df = pd.read_csv(tmp_path)
         elif filename.endswith((".xls", ".xlsx")):
-            df = pd.read_excel(io.BytesIO(content))
+            df = pd.read_excel(tmp_path)
         elif filename.endswith(".pdf"):
             import pdfplumber
-            with pdfplumber.open(io.BytesIO(content)) as pdf:
-                return {"page_count": len(pdf.pages), "is_pdf": True, "is_image": False}
+            with pdfplumber.open(tmp_path) as pdf:
+                res = {"page_count": len(pdf.pages), "is_pdf": True, "is_image": False}
+                os.unlink(tmp_path)
+                return res
         elif filename.endswith((".png", ".jpg", ".jpeg", ".webp")):
+            os.unlink(tmp_path)
             return {"page_count": 1, "is_pdf": False, "is_image": True}
         else:
+            os.unlink(tmp_path)
             return {"error": f"Formato '{filename.split('.')[-1]}' não suportado para análise. Use CSV, Excel, PDF ou Imagem."}
+            
+        os.unlink(tmp_path)
             
         return {
             "columns": df.columns.tolist(), 
@@ -1483,7 +1531,18 @@ async def import_mapped_file(
     import pandas as pd
     import io
     import json
-    content = await file.read()
+    import tempfile
+    import os
+
+    suffix = os.path.splitext(file.filename)[1]
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk:
+                break
+            tmp.write(chunk)
+        tmp_path = tmp.name
+
     filename = file.filename.lower()
     
     try:
@@ -1492,10 +1551,11 @@ async def import_mapped_file(
             answer_mappings = json.loads(answer_mapping_json)
 
         if filename.endswith(".csv"):
-            df = pd.read_csv(io.BytesIO(content))
+            df = pd.read_csv(tmp_path)
         elif filename.endswith((".xls", ".xlsx")):
-            df = pd.read_excel(io.BytesIO(content))
+            df = pd.read_excel(tmp_path)
         else:
+            if os.path.exists(tmp_path): os.unlink(tmp_path)
             return {"error": "Formato não suportado."}
 
         # Fetch existing questions to avoid duplicates (Upsert logic)
@@ -1748,16 +1808,28 @@ async def import_products_file(
     import pandas as pd
     import io
     import json
-    content = await file.read()
+    import tempfile
+    import os
+
+    suffix = os.path.splitext(file.filename)[1]
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk:
+                break
+            tmp.write(chunk)
+        tmp_path = tmp.name
+
     filename = file.filename.lower()
     
     try:
         mappings = json.loads(mapping_json)
         if filename.endswith(".csv"):
-            df = pd.read_csv(io.BytesIO(content))
+            df = pd.read_csv(tmp_path)
         elif filename.endswith((".xls", ".xlsx")):
-            df = pd.read_excel(io.BytesIO(content))
+            df = pd.read_excel(tmp_path)
         else:
+            if os.path.exists(tmp_path): os.unlink(tmp_path)
             return {"error": "Formato não suportado."}
 
         # If primary_col is not provided, use the first column from mapping OR the first column in dataframe

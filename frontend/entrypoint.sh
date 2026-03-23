@@ -1,51 +1,53 @@
 #!/bin/sh
 
-# FunÃ§Ã£o para ler segredo ou variÃ¡vel de ambiente
-# Prioridade: /run/secrets/NOME > VariÃ¡vel de Ambiente NOME
-get_value() {
-    var_name=$1
-    if [ -f "/run/secrets/$var_name" ]; then
-        cat "/run/secrets/$var_name"
-    else
-        eval echo "\$$var_name"
+# Função para ler segredos do Docker e exportar como variáveis de ambiente
+load_secrets() {
+    if [ -f "/run/secrets/VITE_API_URL" ]; then
+        export VITE_API_URL=$(cat /run/secrets/VITE_API_URL)
+        echo "✅ VITE_API_URL carregada do Secret"
+    fi
+    if [ -f "/run/secrets/VITE_AGENT_API_KEY" ]; then
+        export VITE_AGENT_API_KEY=$(cat /run/secrets/VITE_AGENT_API_KEY)
+        echo "✅ VITE_AGENT_API_KEY carregada do Secret"
     fi
 }
 
-# Determina o diretÃ³rio de saÃ­da
-if [ -d "/usr/share/nginx/html" ]; then
-    # ProduÃ§Ã£o (Nginx)
-    CONFIG_DIR="/usr/share/nginx/html"
-else
-    # Desenvolvimento (Vite - geralmente montado em /app)
-    # Se a pasta public existir, salva nela, senÃ£o na raiz
-    if [ -d "/app/public" ]; then
-        CONFIG_DIR="/app/public"
-    else
-        CONFIG_DIR="/app"
+# Função para substituir variáveis de ambiente em arquivos JS e HTML
+replace_env_vars() {
+    if [ ! -d "/usr/share/nginx/html" ]; then
+        echo "⚠️ /usr/share/nginx/html não encontrado. Pulando substituição de variáveis de ambiente no código estático."
+        return
     fi
-fi
 
-CONFIG_FILE="$CONFIG_DIR/config.js"
+    echo "🔍 Substituindo variáveis de ambiente em /usr/share/nginx/html..."
+    # Lista de arquivos para processar
+    FILES=$(find /usr/share/nginx/html -type f \( -name "*.js" -o -name "*.html" \))
 
+    for file in $FILES; do
+        # Substitui VITE_API_URL
+        if [ -n "$VITE_API_URL" ]; then
+            # Remove barra final se houver
+            CLEAN_URL=$(echo $VITE_API_URL | sed 's|/*$||')
+            # Busca por localhost:8002 (padrão de build) ou pelo PLACEHOLDER
+            sed -i "s|http://localhost:8002|$CLEAN_URL|g" "$file"
+            sed -i "s|VITE_API_URL_PLACEHOLDER|$CLEAN_URL|g" "$file"
+        fi
 
-# Recupera os valores priorizando secrets
-API_URL=$(get_value "VITE_API_URL")
-AGENT_API_KEY=$(get_value "VITE_AGENT_API_KEY")
+        # Substitui VITE_AGENT_API_KEY
+        if [ -n "$VITE_AGENT_API_KEY" ]; then
+            sed -i "s|VITE_AGENT_API_KEY_PLACEHOLDER|$VITE_AGENT_API_KEY|g" "$file"
+        fi
+    done
+}
 
-# Garante que API_URL sempre tenha o protocolo https://
-case "$API_URL" in
-  http://*|https://*) ;;
-  *) API_URL="https://$API_URL" ;;
-esac
+echo "🚀 Iniciando frontend..."
 
-echo "window.configs = {" > $CONFIG_FILE
-echo "  VITE_API_URL: \"${API_URL}\"," >> $CONFIG_FILE
-echo "  VITE_AGENT_API_KEY: \"${AGENT_API_KEY}\"" >> $CONFIG_FILE
-echo "};" >> $CONFIG_FILE
+# 1. Carrega os segredos do Portainer
+load_secrets
 
-echo "Arquivo config.js gerado com as seguintes variÃ¡veis (valores ocultos por seguranÃ§a):"
-echo "VITE_API_URL detectado: ${API_URL}"
+# 2. Executa a substituição das variáveis no código estático
+echo "📍 API URL Final: ${VITE_API_URL:-'Não encontrada'}"
+replace_env_vars
 
-# Inicia o Nginx (comando original do container)
+# 3. Executa o comando passado para o container (CMD)
 exec "$@"
-

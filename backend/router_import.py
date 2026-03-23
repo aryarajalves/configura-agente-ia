@@ -143,15 +143,35 @@ async def preview_smart_import(
     db: AsyncSession = Depends(get_db)
 ):
     print(f"DEBUG: preview_smart_import called. KB={kb_id}, Type={extraction_type}, Count={global_qa_count}, Mode={mode}")
-    file_content = await file.read()
+    
+    import tempfile
+    import os
+    suffix = os.path.splitext(file.filename)[1]
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk:
+                break
+            tmp.write(chunk)
+        tmp_path = tmp.name
+
     filename = file.filename.lower()
     
-    if filename.endswith((".png", ".jpg", ".jpeg", ".webp")):
-        pages_data = await extract_text_from_image(file_content)
-    else:
-        pages_data = await extract_text_from_pdf(file_content, start_page, end_page)
+    try:
+        if filename.endswith((".png", ".jpg", ".jpeg", ".webp")):
+            # Imagens ainda usam bytes por enquanto (geralmente pequenas)
+            with open(tmp_path, "rb") as f:
+                content = f.read()
+            pages_data = await extract_text_from_image(content)
+        else:
+            # PDFs usam o caminho do arquivo (streaming)
+            pages_data = await extract_text_from_pdf(tmp_path, start_page, end_page)
+    except Exception as e:
+        if os.path.exists(tmp_path): os.unlink(tmp_path)
+        return {"error": f"Erro ao processar arquivo: {str(e)}"}
     
     if not pages_data:
+        if os.path.exists(tmp_path): os.unlink(tmp_path)
         return {"error": "Nenhum texto extraído. Verifique se o arquivo contém texto legível."}
         
     full_text = "\n".join([p["text"] for p in pages_data])
@@ -233,7 +253,7 @@ async def preview_smart_import(
                 async with sem_sections:
                     text = section["text"]
                     if use_vision:
-                        visual = await extract_visual_content_from_section(file_content, section)
+                        visual = await extract_visual_content_from_section(tmp_path, section)
                         if visual:
                             text = text + "\n\n" + visual
                     qas, usage = await generate_global_qa(
@@ -294,6 +314,10 @@ async def preview_smart_import(
                     })
 
     await _log_extraction_cost(db, kb_id, total_usage, "Importação de PDF")
+
+    # Limpeza final do arquivo temporário
+    if os.path.exists(tmp_path):
+        os.unlink(tmp_path)
 
     return {
         "preview": preview_items, 

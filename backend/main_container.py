@@ -522,16 +522,38 @@ async def extract_text_from_docx(content: bytes):
 
 @app.post("/knowledge-bases/{kb_id}/upload")
 async def upload_kb_file(kb_id: int, file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
-    content = await file.read()
+    import tempfile
+    import os
+    suffix = os.path.splitext(file.filename)[1]
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, mode='wb') as tmp:
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk:
+                break
+            tmp.write(chunk)
+        tmp_path = tmp.name
+
     filename = file.filename.lower()
     
-    text = ""
-    if filename.endswith(".pdf"):
-        text = await extract_text_from_pdf(content)
-    elif filename.endswith(".docx"):
-        text = await extract_text_from_docx(content)
-    else:
-        text = content.decode("utf-8", errors="ignore")
+    try:
+        text = ""
+        if filename.endswith(".pdf"):
+            # Update to use path if extract_text_from_pdf supports it, 
+            # or just read bytes if it's small.
+            with open(tmp_path, "rb") as f:
+                content = f.read()
+            text = await extract_text_from_pdf(content)
+        elif filename.endswith(".docx"):
+            with open(tmp_path, "rb") as f:
+                content = f.read()
+            text = await extract_text_from_docx(content)
+        else:
+            with open(tmp_path, "r", encoding="utf-8", errors="ignore") as f:
+                text = f.read()
+
+    except Exception as e:
+        if os.path.exists(tmp_path): os.unlink(tmp_path)
+        return {"error": str(e)}
 
     # Simple logic to split text into Q&A or just chunks
     # For now, let's create chunks of text as "Knowledge Items"
@@ -556,22 +578,38 @@ async def upload_kb_file(kb_id: int, file: UploadFile = File(...), db: AsyncSess
 async def analyze_kb_file(file: UploadFile = File(...)):
     import pandas as pd
     import io
-    content = await file.read()
+    import tempfile
+    import os
+    
+    suffix = os.path.splitext(file.filename)[1]
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, mode='wb') as tmp:
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk:
+                break
+            tmp.write(chunk)
+        tmp_path = tmp.name
+
     filename = file.filename.lower()
     
     try:
         if filename.endswith(".csv"):
-            df = pd.read_csv(io.BytesIO(content), nrows=5)
+            df = pd.read_csv(tmp_path, nrows=5)
         elif filename.endswith((".xls", ".xlsx")):
-            df = pd.read_excel(io.BytesIO(content), nrows=5)
+            df = pd.read_excel(tmp_path, nrows=5)
         elif filename.endswith(".pdf"):
             import pdfplumber
-            with pdfplumber.open(io.BytesIO(content)) as pdf:
-                return {"page_count": len(pdf.pages), "is_pdf": True}
+            with pdfplumber.open(tmp_path) as pdf:
+                res = {"page_count": len(pdf.pages), "is_pdf": True}
+                if os.path.exists(tmp_path): os.unlink(tmp_path)
+                return res
         else:
+            if os.path.exists(tmp_path): os.unlink(tmp_path)
             return {"error": "Formato não suportado para análise. Use CSV, Excel ou PDF."}
             
-        return {"columns": df.columns.tolist(), "preview": df.head(3).to_dict(orient="records"), "is_pdf": False}
+        res = {"columns": df.columns.tolist(), "preview": df.head(3).to_dict(orient="records"), "is_pdf": False}
+        if os.path.exists(tmp_path): os.unlink(tmp_path)
+        return res
     except Exception as e:
         return {"error": str(e)}
 
@@ -590,15 +628,27 @@ async def import_mapped_file(
     import pandas as pd
     import io
     import json
-    content = await file.read()
+    import tempfile
+    import os
+
+    suffix = os.path.splitext(file.filename)[1]
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, mode='wb') as tmp:
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk:
+                break
+            tmp.write(chunk)
+        tmp_path = tmp.name
+
     filename = file.filename.lower()
     
     try:
         if filename.endswith(".csv"):
-            df = pd.read_csv(io.BytesIO(content))
+            df = pd.read_csv(tmp_path)
         elif filename.endswith((".xls", ".xlsx")):
-            df = pd.read_excel(io.BytesIO(content))
+            df = pd.read_excel(tmp_path)
         else:
+            if os.path.exists(tmp_path): os.unlink(tmp_path)
             return {"error": "Formato não suportado."}
 
         # Fetch existing questions to avoid duplicates (Upsert logic)
@@ -689,16 +739,28 @@ async def import_products_file(
     import pandas as pd
     import io
     import json
-    content = await file.read()
+    import tempfile
+    import os
+
+    suffix = os.path.splitext(file.filename)[1]
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, mode='wb') as tmp:
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk:
+                break
+            tmp.write(chunk)
+        tmp_path = tmp.name
+
     filename = file.filename.lower()
     
     try:
         mappings = json.loads(mapping_json)
         if filename.endswith(".csv"):
-            df = pd.read_csv(io.BytesIO(content))
+            df = pd.read_csv(tmp_path)
         elif filename.endswith((".xls", ".xlsx")):
-            df = pd.read_excel(io.BytesIO(content))
+            df = pd.read_excel(tmp_path)
         else:
+            if os.path.exists(tmp_path): os.unlink(tmp_path)
             return {"error": "Formato não suportado."}
 
         # Fetch existing

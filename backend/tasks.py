@@ -9,6 +9,7 @@ from models import BackgroundProcessLog, KnowledgeBaseModel, KnowledgeItemModel
 from transcription_service import transcribe_video
 from smart_importer import chunk_text, generate_global_qa
 from rag_service import get_batch_embeddings
+from services.s3_service import s3_service
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +52,15 @@ def process_video_task(self, log_id: int, payload: dict):
             
             # 1. Transcrição via AssemblyAI (Síncrono/Bloqueante, rodando em thread para não travar o loop)
             self.update_state(state='PROGRESS', meta={'progress': 10})
+            
+            # Se for S3 Key, gera URL pré-assinada
+            actual_path = video_path
+            if s3_service.enabled and video_path and not os.path.exists(video_path):
+                actual_path = s3_service.get_presigned_url(video_path)
+                logger.info(f"Usando URL pré-assinada para S3 (video_task): {video_path}")
+            
             trans_config = {}
-            trans_result = await asyncio.to_thread(transcribe_video, video_path, trans_config)
+            trans_result = await asyncio.to_thread(transcribe_video, actual_path, trans_config)
             
             text_transcribed = trans_result["text"]
             duration = trans_result.get("duration", 0)
@@ -179,9 +187,13 @@ def process_video_task(self, log_id: int, payload: dict):
             # Garante que o motor seja limpo entre execuções de loops diferentes (Asyncio Run em Celery)
             await engine.dispose()
             # Garante remoção do vídeo temporário
-            if video_path and os.path.exists(video_path):
-                try: os.remove(video_path)
-                except: pass
+            if video_path:
+                if os.path.exists(video_path):
+                    try: os.remove(video_path)
+                    except: pass
+                elif s3_service.enabled:
+                    try: s3_service.delete_object(video_path)
+                    except: pass
 
     # Executa toda a lógica em um único loop de evento
     asyncio.run(_async_logic())
@@ -215,23 +227,36 @@ def process_kb_media_task(self, log_id: int, kb_id: int, payload: dict):
                     self.update_state(state='PROGRESS', meta={'progress': 10})
                     await _update_log_status(log_id, "PROCESSANDO", 10, details_update={"step": "Transcrevendo arquivo"})
                     
-                    trans_result = await asyncio.to_thread(transcribe_video, file_path, {})
+                    # Se for S3 Key, gera URL pré-assinada
+                    actual_path = file_path
+                    if s3_service.enabled and file_path and not os.path.exists(file_path):
+                        actual_path = s3_service.get_presigned_url(file_path)
+                        logger.info(f"Usando URL pré-assinada para S3: {file_path}")
+                    
+                    trans_result = await asyncio.to_thread(transcribe_video, actual_path, {})
                     text_transcribed = trans_result.get("text", "")
                     duration = trans_result.get("duration", 0)
                     
                     await _update_log_status(log_id, "PROCESSANDO", 45, details_update={"step": "Transcrição Concluída"})
                 else:
-                    # Leitura direta do txt
+                    # Leitura direta do txt (S3 não suportado ainda para TXT aqui, mas podemos adicionar se necessário)
                     await _update_log_status(log_id, "PROCESSANDO", 10, details_update={"step": "Lendo arquivo de texto"})
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        text_transcribed = f.read()
-                    await _update_log_status(log_id, "PROCESSANDO", 40, details_update={"read": "Concluída"})
+                    if os.path.exists(file_path):
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            text_transcribed = f.read()
+                        await _update_log_status(log_id, "PROCESSANDO", 40, details_update={"read": "Concluída"})
+                    else:
+                        raise Exception(f"Arquivo local não encontrado: {file_path}")
             finally:
-                if file_path and os.path.exists(file_path):
-                    try:
-                        os.remove(file_path)
-                    except:
-                        pass
+                # Limpeza
+                if file_path:
+                    if os.path.exists(file_path):
+                        try: os.remove(file_path)
+                        except: pass
+                    elif s3_service.enabled:
+                        # Se não existe localmente e S3 está ON, assumimos que é uma Key do S3
+                        try: s3_service.delete_object(file_path)
+                        except: pass
 
             if not text_transcribed.strip():
                 await _update_log_status(log_id, "ERRO", 0, error_message="Nenhum texto detectado no arquivo.")

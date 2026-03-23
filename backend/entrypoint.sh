@@ -34,5 +34,5 @@ if [ $# -gt 0 ]; then
     exec "$@"
 else
     echo "🚀 Iniciando aplicação web..."
-    exec python -m gunicorn main:app -w "${GUNICORN_WORKERS:-4}" -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --timeout 120
+    exec python -m gunicorn main:app -w "${GUNICORN_WORKERS:-4}" -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --timeout "${GUNICORN_TIMEOUT:-120}"
 fi
