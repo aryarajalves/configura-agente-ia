@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 from sqlalchemy import Column, String, Enum, DateTime, UUID, ForeignKey, Integer, Text, Numeric, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSON
 import uuid
 from backend.src.database import Base
 from pgvector.sqlalchemy import Vector
@@ -65,7 +65,7 @@ class SkillSource(Base):
     source_type = Column(Enum(SourceType), nullable=False)
     source_uri = Column(String, nullable=False)
     filename = Column(String, nullable=False)
-    metadata_ = Column("metadata", JSONB, nullable=True)
+    metadata_ = Column("metadata", JSON, nullable=True)
     checksum = Column(String, nullable=True)
     
     created_at = Column(DateTime, default=datetime.utcnow)

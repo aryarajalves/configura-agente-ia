@@ -142,6 +142,22 @@ const Sidebar = ({ onLogout }) => {
                                         <span className="nav-label">Integrações</span>
                                         <div className="active-indicator"></div>
                                     </NavLink>
+                                    <NavLink
+                                        to="/performance/stress-test"
+                                        className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                                    >
+                                        <span className="nav-icon">⚡</span>
+                                        <span className="nav-label">Teste de Estresse</span>
+                                        <div className="active-indicator"></div>
+                                    </NavLink>
+                                    <NavLink
+                                        to="/inbox"
+                                        className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                                    >
+                                        <span className="nav-icon">📥</span>
+                                        <span className="nav-label">Inbox (Falhas)</span>
+                                        <div className="active-indicator"></div>
+                                    </NavLink>
                                 </>
                             )}
                         </div>

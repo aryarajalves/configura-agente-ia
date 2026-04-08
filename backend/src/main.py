@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from backend.src.api.v1 import agents, chat, audit
+from backend.src.api.v1 import agents, chat, audit, stress_tests, inbox
 from backend.src.api.middleware import error_handling_middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -15,6 +15,8 @@ app.add_middleware(BaseHTTPMiddleware, dispatch=error_handling_middleware)
 app.include_router(agents.router, prefix="/v1/agents", tags=["Agents"])
 app.include_router(chat.router, prefix="/v1/chat", tags=["Chat"])
 app.include_router(audit.router, prefix="/v1/audit", tags=["Audit"])
+app.include_router(stress_tests.router, prefix="/v1/stress-tests", tags=["Performance"])
+app.include_router(inbox.router, prefix="/v1/inbox", tags=["Inbox"])
 
 @app.get("/")
 async def root():
