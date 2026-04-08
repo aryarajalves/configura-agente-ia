@@ -43,7 +43,7 @@
 - **resposta_final_usuario**: text
 - **frequencia_erro**: int
 - **status**: enum(`pendente`, `resolvido`, `descartado`, `bloqueado`)
-- **group_id**: UUID / nullable (grouping key for similar failures)
+- **group_id**: UUID / nullable (grouping key for similar failures based on string similarity)
 - **blocked**: boolean
 - **discarded**: boolean
 - **resolver_id**: UUID / user reference
@@ -51,7 +51,7 @@
 - **created_at**: timestamp
 - **updated_at**: timestamp
 
-### Background_Task
+### BackgroundTask
 - **id**: UUID / primary key
 - **tipo**: enum(`ingestao`, `stresstest`)
 - **taskiq_task_id**: string
@@ -68,8 +68,8 @@
 ## Relationships
 
 - A `StressTest_Session` references `StressTest_Persona` and may generate multiple `Inbox_Item` records.
-- A `Background_Task` can relate to a `StressTest_Session` or an `Inbox_Item` for traceability.
-- `Inbox_Item` groups use `group_id` to express clustering by semantic similarity and repeated impact.
+- A `BackgroundTask` can relate to a `StressTest_Session` or an `Inbox_Item` for traceability.
+- `Inbox_Item` groups use `group_id` to express clustering by string similarity and repeated impact.
 
 ## Notes
 

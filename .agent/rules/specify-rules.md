@@ -3,6 +3,8 @@
 Auto-generated from all feature plans. Last updated: 2026-04-08
 
 ## Active Technologies
+- Python 3.12+ (Backend), TypeScript 5+ (Frontend) + FastAPI, SQLAlchemy (Async), LangGraph, TaskIQ, RabbitMQ, Pydantic v2 (003-performance-tools)
+- PostgreSQL (Relational) (003-performance-tools)
 
 - Python 3.12+ (Async) + FastAPI, SQLAlchemy (Async), LangGraph, TaskIQ, RabbitMQ, Pydantic v2, pgvector. (001-fluxai-core-engine)
 
@@ -22,6 +24,7 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.12+ (Async): Follow standard conventions
 
 ## Recent Changes
+- 003-performance-tools: Added Python 3.12+ (Backend), TypeScript 5+ (Frontend) + FastAPI, SQLAlchemy (Async), LangGraph, TaskIQ, RabbitMQ, Pydantic v2
 
 - 001-fluxai-core-engine: Added Python 3.12+ (Async) + FastAPI, SQLAlchemy (Async), LangGraph, TaskIQ, RabbitMQ, Pydantic v2, pgvector.
 

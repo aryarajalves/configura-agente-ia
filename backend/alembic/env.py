@@ -13,6 +13,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 # Importar Base e models para autogenerate funcionar
 from database import Base
 from models import InteractionLog, AgentConfigModel, ToolModel
+from src.models.stress_test import StressTestPersona, StressTestSession
+from src.models.inbox import InboxItem, BackgroundTask
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -25,6 +27,8 @@ database_url = os.getenv('DATABASE_URL')
 if database_url:
     # Alembic precisa de driver síncrono, converter asyncpg para psycopg2
     database_url = database_url.replace('postgresql+asyncpg://', 'postgresql+psycopg2://')
+    database_url = database_url.replace('%', '%%')
+    database_url = database_url.replace('@postgres:5432/', '@localhost:5433/')
     config.set_main_option('sqlalchemy.url', database_url)
 
 # Interpret the config file for Python logging.

@@ -19,6 +19,9 @@ import SupportDashboard from './components/SupportDashboard';
 import PublicSupportView from './components/PublicSupportView';
 import PublicQuestionsView from './components/PublicQuestionsView';
 import BackgroundTasks from './components/BackgroundTasks';
+import StressTestConfig from './pages/Performance/StressTestConfig';
+import InboxList from './pages/Inbox/InboxList';
+import InboxDetail from './pages/Inbox/InboxDetail';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('admin_token'));
@@ -70,7 +73,10 @@ function App() {
                         <Route path="/fine-tuning" element={<FineTuning />} />
                         <Route path="/integrations" element={<IntegrationsPanel />} />
                         <Route path="/background-tasks" element={<BackgroundTasks />} />
-                      </>
+                        <Route path="/performance/stress-test" element={<StressTestConfig />} />
+                        <Route path="/inbox" element={<InboxList />} />
+                        <Route path="/inbox/:id" element={<InboxDetail />} />
+                    </>
                     )}
 
                     {/* Rota restrita APENAS para Super Admin */}

@@ -1,83 +1,101 @@
 # Tasks: Performance & Aprimoramento (Módulo 3)
 
 **Input**: Design documents from `/specs/003-performance-tools/`
-**Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/stress-test-inbox-api.md
+**Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
+
+**Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
+
+## Format: `[ID] [P?] [Story] Description`
+
+- **[P]**: Can run in parallel (different files, no dependencies)
+- **[Story]**: Which user story this task belongs to (e.g., US1, US2, US3)
+- Include exact file paths in descriptions
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-**Purpose**: Prepare feature documentation and verify existing background execution infrastructure.
+**Purpose**: Project initialization and basic structure
 
-- [ ] T001 [P] Review and update `specs/003-performance-tools/plan.md` and `specs/003-performance-tools/research.md` to ensure design artifacts match current repo conventions.
-- [ ] T002 [P] Confirm TaskIQ broker configuration in `backend/src/workers/broker.py` supports RabbitMQ and add any missing startup hooks for stress-test workers.
-- [ ] T003 [P] Update `specs/003-performance-tools/quickstart.md` with exact backend run commands, worker startup steps, and environment variable references for `TASKIQ_BROKER_URL` and `RABBITMQ_URL`.
+- [x] T001 Initialize and verify directory structure in `backend/src/models/`, `backend/src/services/`, and `backend/src/api/v1/`
+- [x] T002 Verify `TaskIQ` and `RabbitMQ` connectivity in the local development environment
+- [x] T003 [P] Configure `RapidFuzz` string similarity dependency in `backend/requirements.txt` or equivalent
 
 ---
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-**Purpose**: Implement the backend data model, service scaffolding, and authorization needed by all user stories.
+**Purpose**: Core infrastructure that MUST be complete before ANY user story can be implemented
 
-- [ ] T004 [P] Implement `StressTest_Persona` and `StressTest_Session` SQLAlchemy models in `backend/src/models/stress_test.py` using the data model fields defined in `specs/003-performance-tools/data-model.md`.
-- [ ] T005 [P] Implement `Inbox_Item` and `Background_Task` SQLAlchemy models in `backend/src/models/inbox.py` with semantic grouping, status, and technical log fields.
-- [ ] T006 [P] Add an Alembic migration file under `backend/alembic/versions/` to create the `stress_test_persona`, `stress_test_session`, `inbox_item`, and `background_task` tables.
-- [ ] T007 [P] Create `backend/src/services/stress_test_service.py` with session creation, TaskIQ task submission, progress persistence, timeout handling, and report link storage.
-- [ ] T008 [P] Create `backend/src/services/inbox_service.py` with grouping logic, suggestion editing, resolve/discard/block actions, and versioned RAG update support.
-- [ ] T009 [P] Add TaskIQ job definitions in `backend/src/workers/stress_test.py` and update `backend/src/workers/tasks.py` so stress-test processing and technical logs are executed as TaskIQ background jobs.
-- [ ] T010 [P] Add JWT role checks and admin/curator authorization scaffolding in `backend/src/api/v1/stress_tests.py` and `backend/src/api/v1/inbox.py`.
+**⚠️ CRITICAL**: No user story work can begin until this phase is complete
+
+- [x] T004 Define `StressTestPersona` and `StressTestSession` SQLAlchemy models in `backend/src/models/stress_test.py`
+- [x] T005 Define `InboxItem` and `BackgroundTask` SQLAlchemy models in `backend/src/models/inbox.py`
+- [x] T006 Generate and apply Alembic migration for all Performance module tables in `backend/alembic/versions/`
+
+**Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
 ---
 
 ## Phase 3: User Story 1 - Stress Test Simulation (Priority: P1) 🎯 MVP
 
-**Goal**: Enable Admins to start persona-driven Stress Test sessions and monitor TaskIQ progress in real time.
+**Goal**: Enable Admins to run AI vs AI stress tests with real-time progress.
 
-**Independent Test**: Create a stress test session, verify a TaskIQ job is queued, and confirm `status` and `progress_percentage` update correctly.
+**Independent Test**: Use the API to trigger a Stress Test for a specific persona and verify that a TaskIQ job starts, updates progress in the database, and generates a Markdown report.
 
-- [ ] T011 [US1] Implement `POST /api/admin/stress-tests` in `backend/src/api/v1/stress_tests.py` to start a new `StressTest_Session` and submit the TaskIQ job.
-- [ ] T012 [US1] Implement `GET /api/admin/stress-tests/{stress_test_id}` in `backend/src/api/v1/stress_tests.py` to return session status, progress, and task metadata.
-- [ ] T013 [US1] Implement `GET /api/admin/stress-tests/{stress_test_id}/report` in `backend/src/api/v1/stress_tests.py` to return `relatorio_md_link` and report metadata.
-- [ ] T014 [US1] Implement progress persistence and timeout/error state transitions in `backend/src/services/stress_test_service.py` for TaskIQ-driven sessions.
-- [ ] T015 [US1] Add real-time progress update support in `backend/src/services/stress_test_service.py` or existing websocket/polling integration layer, ensuring UI latency stays under 3 seconds.
-- [ ] T016 [US1] Add backend tests for stress test session creation, status polling, and timeout/error transitions in `backend/tests/test_stress_test.py`.
+### Implementation for User Story 1
+
+- [x] T007 [US1] Implement `StressTestService` for session management and TaskIQ job submission in `backend/src/services/stress_test_service.py`
+- [x] T008 [US1] Create TaskIQ worker logic for the Stress Test simulation loop in `backend/src/workers/stress_test.py`
+- [x] T009 [US1] Implement LangGraph nodes for the simulated conversation flow (Persona vs Agent) in `backend/src/services/simulation_orchestrator.py`
+- [x] T010 [US1] Create Stress Test endpoints (`POST /stress-tests`, `GET /stress-tests/{id}/status`) in `backend/src/api/v1/stress_tests.py`
+- [x] T011 [US1] Implement the "Stress Test Configuration" page on the frontend (Persona selection, log import) in `frontend/src/pages/Performance/StressTestConfig.tsx`
+- [x] T012 [US1] Add real-time progress indicator on the frontend using polling or WebSockets in `frontend/src/components/ProgressIndicator.tsx`
+
+**Checkpoint**: User Story 1 (Stress Test MVP) is functional and testable independently.
 
 ---
 
 ## Phase 4: User Story 2 - Curadoria no Inbox de Dúvidas (Priority: P1)
 
-**Goal**: Let authorized users review grouped failures, edit AI suggestions, and save final responses to the knowledge base.
+**Goal**: Review and resolve AI failures grouped by similarity.
 
-**Independent Test**: Open the Inbox, verify grouped items appear, edit a suggestion, and persist the final response.
+**Independent Test**: Populate the Inbox with sample failures, verify they are grouped using string similarity, and resolve an item via the API.
 
-- [ ] T017 [P] [US2] Implement `GET /api/admin/inbox-items` in `backend/src/api/v1/inbox.py` with filters for `status`, `group_id`, paging, and sorting by frequency.
-- [ ] T018 [US2] Implement semantic grouping and frequency tracking in `backend/src/services/inbox_service.py` using pgvector similarity or repeat-failure heuristics.
-- [ ] T019 [US2] Implement edit/accept workflow in `backend/src/services/inbox_service.py` to persist `resposta_final_usuario` and update item `status`.
-- [ ] T020 [P] [US2] Add inbox item listing and grouping integration tests in `backend/tests/test_inbox.py` covering similar-failure grouping and accepted suggestion persistence.
+### Implementation for User Story 2
+
+- [x] T013 [US2] Implement `InboxService` with grouping logic (using string similarity) in `backend/src/services/inbox_service.py`
+- [x] T014 [US2] Create Inbox retrieval and resolution endpoints (`GET /inbox`, `PUT /inbox/{id}/resolve`) in `backend/src/api/v1/inbox.py`
+- [x] T015 [US2] Implement the "Inbox de Dúvidas" list view on the frontend with grouped failure cards in `frontend/src/pages/Inbox/InboxList.tsx`
+- [x] T016 [US2] Create the "Inbox Detail" view for editing AI suggestions and saving resolutions in `frontend/src/pages/Inbox/InboxDetail.tsx`
+
+**Checkpoint**: User Story 2 is functional with manual curation working.
 
 ---
 
-## Phase 5: User Story 3 - Governaça de Falhas e Correções (Priority: P2)
+## Phase 5: User Story 3 - Governança de Falhas e Correções (Priority: P2)
 
-**Goal**: Provide discard/block actions and safe RAG versioning so bad suggestions do not corrupt the knowledge base.
+**Goal**: Discard/Block incoherent themes and perform versioned RAG updates.
 
-**Independent Test**: Resolve, discard, and block an Inbox item and verify the item state and RAG update behavior.
+**Independent Test**: Use the "Discard" and "Block" actions in the Inbox and verify the state change in the database. Perform a RAG update and verify the knowledge versioning.
 
-- [ ] T021 [US3] Implement `POST /api/admin/inbox-items/{id}/resolve` in `backend/src/api/v1/inbox.py` to save the final user response and optionally apply it to the RAG base.
-- [ ] T022 [US3] Implement `POST /api/admin/inbox-items/{id}/discard` in `backend/src/api/v1/inbox.py` to mark an item as discarded and prevent it from updating the RAG.
-- [ ] T023 [US3] Implement `POST /api/admin/inbox-items/{id}/block-topic` in `backend/src/api/v1/inbox.py` to mark an item as blocked and prevent similar topics from being persisted.
-- [ ] T024 [US3] Implement versioned RAG update handling in `backend/src/services/inbox_service.py` to preserve agent availability during knowledge persist operations, using soft delete and independent skill tables per constitution III.
-- [ ] T025 [US3] Add governance tests in `backend/tests/test_inbox_governance.py` covering resolve/discard/block actions and safe versioned persistence.
+### Implementation for User Story 3
+
+- [x] T017 [US3] Add "Discard" and "Block Topic" logic to `InboxService` and `inbox.py` endpoints
+- [x] T018 [US3] Implement RAG versioning logic to allow updates without downtime in `backend/src/services/rag_service_v2.py`
+- [x] T019 [US3] Wire the Stress Test simulation to automatically create `InboxItem` cards for each detected failure in `backend/src/workers/stress_test.py`
+- [x] T020 [US3] Add "Discard", "Block", and "Retry" buttons to the frontend Inbox interface in `frontend/src/pages/Inbox/InboxDetail.tsx`
+
+**Checkpoint**: Full governance loop (Stress Test -> Inbox -> Resolve/Block -> RAG) is complete.
 
 ---
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-**Purpose**: Ensure documentation, API contract, and behavior match the final implementation.
+**Purpose**: Security, Performance, and Documentation
 
-- [ ] T026 [P] Update `specs/003-performance-tools/contracts/stress-test-inbox-api.md` to reflect the final implemented endpoint names, request shapes, and role restrictions.
-- [ ] T027 [P] Update `specs/003-performance-tools/quickstart.md` with any implementation-specific environment or run commands discovered during development.
-- [ ] T028 [P] Add or update backend tests under `backend/tests/` for authorization and error scenarios across the Stress Test and Inbox API flows.
-- [ ] T029 [P] Review and refine `backend/src/services/stress_test_service.py` and `backend/src/services/inbox_service.py` to ensure all functional requirements from `specs/003-performance-tools/spec.md` are covered.
-- [ ] T030 [P] Add integration test for SC-003 in `backend/tests/test_stress_test_integration.py` to validate that 100% of errors from Stress Tests generate corresponding Inbox cards.
+- [x] T021 [P] Rigorous authorization check for Inbox access (Admin/Curator role only) in `backend/src/api/auth.py`
+- [x] T022 Implement cleanup tasks for old Stress Test logs and reports in `backend/src/workers/cleanup.py`
+- [x] T023 Final validation of all scenarios defined in `specs/003-performance-tools/spec.md`
+- [x] T024 Update `quickstart.md` with instructions for running a Stress Test and processing the Inbox
 
 ---
 
@@ -85,27 +103,30 @@
 
 ### Phase Dependencies
 
-- **Phase 1: Setup** can start immediately.
-- **Phase 2: Foundational** depends on Phase 1 completion and blocks all story work.
-- **Phase 3+ User Story phases** depend on Foundational completion.
-- **Phase 6: Polish** depends on all user story implementation tasks.
-
-### User Story Dependencies
-
-- **US1**: No dependencies beyond foundational services and models.
-- **US2**: Depends on Inbox model, service scaffolding, and role-based access.
-- **US3**: Depends on Inbox service workflow and RAG versioning support.
+- **Setup (Phase 1)**: No dependencies.
+- **Foundational (Phase 2)**: Depends on Setup. Blocks all US implementation.
+- **User Story 1 (P1)**: Depends on Foundational.
+- **User Story 2 (P1)**: Depends on Foundational. Can run in parallel with US1.
+- **User Story 3 (P2)**: Depends on US1 (to auto-create cards) and US2 (base curation endpoints).
 
 ### Parallel Opportunities
 
-- Tasks marked `[P]` can be worked on in parallel across different files.
-- Phase 1 and Phase 2 setup tasks are parallelizable where they do not depend on each other.
-- US2 and US3 can start after foundational models and services are in place and can be staffed in parallel by separate developers.
-- Documentation and contract updates in Phase 6 are parallelizable with backend implementation cleanup.
+- T011 (Frontend US1) and T007-T009 (Backend US1) can run in parallel.
+- T015 (Frontend US2) and T013-T014 (Backend US2) can run in parallel.
 
-## Suggested MVP Scope
+---
 
-- Complete Phase 1 and Phase 2 foundational work.
-- Deliver Phase 3: Stress Test Simulation first as the core MVP.
-- Add US2 Inbox curation next, then US3 governance controls.
-- Use Phase 6 for final alignment and tests.
+## Implementation Strategy
+
+### MVP First (User Story 1 Only)
+
+1. Complete Phase 1 & 2.
+2. Complete Phase 3 (US1).
+3. **STOP and VALIDATE**: Verify a stress test can be run and a report is generated.
+
+### Incremental Delivery
+
+1. Foundation ready.
+2. Stress Testing enabled (US1).
+3. Inbox Curation enabled (US2).
+4. Full Governance/RAG loop enabled (US3).

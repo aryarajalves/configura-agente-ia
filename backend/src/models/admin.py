@@ -7,6 +7,7 @@ from backend.src.database import Base
 class AdminRole(str, enum.Enum):
     SUPERADMIN = "SUPERADMIN"
     ADMIN = "ADMIN"
+    CURATOR = "CURATOR"
 
 class Admin(Base):
     __tablename__ = "admins"

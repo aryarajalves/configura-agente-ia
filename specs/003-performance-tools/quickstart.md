@@ -1,72 +1,28 @@
 # Quickstart: Performance & Aprimoramento (Módulo 3)
 
-## Prerequisites
+Este guia explica como utilizar as novas ferramentas de simulação e curadoria do FluxAI.
 
-- Python 3.12+
-- Docker and Docker Compose (or equivalent RabbitMQ/Postgres environment)
-- RabbitMQ accessible via `RABBITMQ_URL`
-- PostgreSQL accessible via `DATABASE_URL`
-- Node.js if frontend integration is required
+## 1. Simulação de Estresse (AI vs AI)
 
-## Setup
+O objetivo é testar o agente proativamente usando personas que tentam induzir falhas.
 
-1. Start infrastructure services:
+1.  Acesse o menu **Teste de Estresse** na sidebar.
+2.  Selecione uma **Persona** (ex: "Usuário Impaciente" ou "Buscador de Descontos").
+3.  Clique em **Iniciar Simulação**.
+4.  Acompanhe o progresso em tempo real.
+5.  Ao finalizar, se houver falhas detectadas, elas serão enviadas automaticamente para o **Inbox**.
 
-```bash
-# From repository root
-docker compose -f infra/docker-compose-local.yml up -d postgres rabbitmq
-```
+## 2. Curadoria no Inbox de Dúvidas
 
-2. Configure environment variables:
+O Inbox agrupa falhas semelhantes para que você resolva várias ocorrências com uma única correção.
 
-```bash
-export DATABASE_URL="postgresql://user:password@localhost:5432/fluxai"
-export RABBITMQ_URL="amqp://guest:guest@localhost:5672/"
-export TASKIQ_BROKER_URL="$RABBITMQ_URL"
-```
+1.  Acesse o menu **Inbox (Falhas)**.
+2.  Veja a lista de cards. Cards com maior **Frequência** indicam problemas mais críticos.
+3.  Clique em um card para ver os **Detalhes da Divergência**.
+4.  Analise a pergunta do usuário e o que a IA respondeu.
+5.  Refine a **Sugestão de Resposta**.
+6.  Clique em **Resolver e Atualizar IA** para aplicar a correção ao RAG em tempo real.
+7.  Ou use **Descartar/Bloquear** para ignorar o tema.
 
-3. Install backend dependencies:
-
-```bash
-cd backend
-pip install -r requirements.txt
-```
-
-4. Run database migrations:
-
-```bash
-cd backend
-alembic upgrade head
-```
-
-## Run the feature
-
-1. Start the backend API:
-
-```bash
-cd backend
-uvicorn main:app --reload
-```
-
-2. Start the TaskIQ worker:
-
-```bash
-cd backend
-taskiq worker src.workers.broker:broker
-```
-
-3. Open the admin UI and access the Performance / Stress Test dashboard.
-4. Create a new Stress Test session by selecting a persona and importing conversation logs.
-5. Monitor progress through the dashboard and verify that the session status updates in real time.
-6. Open the Inbox de Dúvidas, review grouped failures, edit or accept AI suggestions, and save corrections.
-
-## Validation
-
-- Confirm Stress Test sessions create a `relatorio_md_link` and show accurate progress.
-- Confirm Inbox items group by similarity and only authorized Admin/Curator roles can access the Inbox.
-- Confirm discarded or blocked failures do not update the RAG knowledge base.
-
-## Notes
-
-- This feature relies on TaskIQ for background work and real-time progress visibility in the frontend.
-- Use the API contract in `specs/003-performance-tools/contracts/stress-test-inbox-api.md` for UI integration details.
+---
+**Nota Técnica**: Todas as atualizações são versionadas (V+1), garantindo que o agente nunca fique offline durante a melhoria do conhecimento.

@@ -1,79 +1,74 @@
-# Implementation Plan: Performance & Aprimoramento (Módulo 3)
+# Implementation Plan: [FEATURE]
 
-**Branch**: `003-performance-tools` | **Date**: 2026-04-08 | **Spec**: [spec.md](spec.md)
-**Input**: Feature specification from `/specs/003-performance-tools/spec.md`
+**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
+**Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/plan-template.md` for the execution workflow.
 
 ## Summary
-
-This feature extends FluxAI with an operational Stress Test and Inbox de curation pipeline.
-It enables simulated AI persona conversations to run as TaskIQ background jobs, captures failures into a curated Inbox, and allows authorized Admin/Curator users to review, edit, approve, or block suggested fixes before they update the RAG knowledge base.
+The "Performance & Aprimoramento" module enables proactive agent quality assurance through Stress Testing (AI vs AI simulations) and an Inbox curation pipeline for human-in-the-loop failure resolution. The technical approach leverages TaskIQ for asynchronous simulation handling, LangGraph for persona orchestration, and string-based similarity for grouping Inbox items, avoiding the additional complexity of vector embeddings for this specific module.
 
 ## Technical Context
 
-**Language/Version**: Python 3.12+ (Async)  
-**Primary Dependencies**: FastAPI, SQLAlchemy (Async), TaskIQ, RabbitMQ, Pydantic v2, LangGraph, pgvector  
-**Storage**: PostgreSQL (relational) + pgvector for similarity grouping  
-**Testing**: pytest + pytest-asyncio, frontend test runners as applicable  
-**Target Platform**: Linux / Docker / On-premise deployment  
-**Project Type**: Web service / AI orchestration feature  
-**Performance Goals**: Stress Test progress updates within 3 seconds for UI visibility; enable an Admin to resolve 10 grouped errors with 2 clicks; preserve retry and timeout resilience for TaskIQ jobs  
-**Constraints**: TaskIQ must handle all heavy background processing; no Celery or synchronous long-running ingestion; every schema change must ship with Alembic migration  
-**Scale/Scope**: Moderate operational tooling for agent quality curation and simulated AI stress testing; not a full enterprise-scale knowledge graph release in this phase
+<!--
+  ACTION REQUIRED: Replace the content in this section with the technical details
+  for the project. The structure here is presented in advisory capacity to guide
+  the iteration process.
+-->
+
+**Language/Version**: Python 3.12+ (Backend), TypeScript 5+ (Frontend)
+**Primary Dependencies**: FastAPI, SQLAlchemy (Async), LangGraph, TaskIQ, RabbitMQ, Pydantic v2
+**Storage**: PostgreSQL (Relational)
+**Testing**: pytest (Backend), Vitest (Frontend)
+**Target Platform**: Linux (Docker-ready)
+**Project Type**: web-service + web-app
+**Performance Goals**: <3s for status updates, persistent background task tracking
+**Constraints**: No blocking I/O on Main UI, TaskIQ-only long-running jobs
+**Scale/Scope**: Módulo 3 of FluxAI Ecosystem
 
 ## Constitution Check
 
-*GATE: Passed on 2026-04-08. Feature aligns with the FluxAI constitution.*
-
-| Principle | Status | Observation |
-|---|---|---|
-| **I. Canonical Stack** | ✅ Pass | Uses FastAPI, PostgreSQL, pgvector, TaskIQ, RabbitMQ in line with constitution. |
-| **II. Service Layer** | ✅ Pass | Background processing and Inbox workflows are service-driven, with thin API routes. |
-| **III. Data Integrity** | ✅ Pass | Entities support unique IDs, soft-delete assumptions, and versioned knowledge updates. |
-| **IV. Performance & Resilience** | ✅ Pass | TaskIQ handles heavy operations; timeouts, retries, and error states are explicit. |
-| **V. Security by Design** | ✅ Pass | Role-based Inbox access and JWT-backed auth remain consistent with constitution. |
-| **VI. Observability** | ✅ Pass | Real-time process telemetry is required for every Stress Test and Inbox state update. |
-| **VII. AI/LLM Integration** | ✅ Pass | Stress Test persona orchestration and Inbox suggestion filtering are managed as controlled AI workflows. |
-| **VIII. UX/UI Integrity** | ✅ Pass | Requires explicit progress visibility and error log details for support workflows. |
-
-> Note: This feature should avoid legacy Celery-based jobs despite any older repository references; TaskIQ + RabbitMQ is the approved background execution path.
+| Principle | Status | Justification / Action |
+|-----------|--------|------------------------|
+| **I. Canonical Tech Stack** | ⚠️ Minor Deviation | Removed `pgvector` for Inbox grouping per user request to simplify. Using string similarity instead. |
+| **II. Service Layer** | ✅ Pass | All logic to be implemented in `stress_test_service.py` and `inbox_service.py`. |
+| **IV. Performance** | ✅ Pass | Offloading processing to TaskIQ as required. |
+| **VII. AI Discipline** | ✅ Pass | Implementing Stress Test simulation loop as mandated. |
+| **VIII. UI Integrity** | ✅ Pass | Providing real-time progress for TaskIQ jobs via API/Frontend syncing. |
 
 ## Project Structure
 
 ### Documentation (this feature)
 
 ```text
-specs/003-performance-tools/
-├── plan.md
-├── research.md
-├── data-model.md
-├── quickstart.md
-├── contracts/
-│   └── stress-test-inbox-api.md
-└── spec.md
+specs/[###-feature]/
+├── plan.md              # This file (/speckit.plan command output)
+├── research.md          # Phase 0 output (/speckit.plan command)
+├── data-model.md        # Phase 1 output (/speckit.plan command)
+├── quickstart.md        # Phase 1 output (/speckit.plan command)
+├── contracts/           # Phase 1 output (/speckit.plan command)
+└── tasks.md             # Phase 2 output (/speckit.tasks command - NOT created by /speckit.plan)
 ```
 
 ### Source Code (repository root)
+<!--
+  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
+  for this feature. Delete unused options and expand the chosen structure with
+  real paths (e.g., apps/admin, packages/something). The delivered plan must
+  not include Option labels.
+-->
 
-```text
-backend/
-├── alembic/
-├── src/
-│   ├── api/
-│   ├── models/
-│   ├── services/
-│   └── workers/
-├── tests/
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-```
-
-**Structure Decision**: Option 2 — Monorepo web application. Backend services implement TaskIQ stress-test orchestration and Inbox API surfaces, while the frontend integrates real-time progress and curation flows.
+**Structure Decision**: Monorepo structure confirmed.
+- `backend/src/models/`: `stress_test.py`, `inbox.py`
+- `backend/src/services/`: `stress_test_service.py`, `inbox_service.py`
+- `backend/src/workers/`: `stress_test.py` (TaskIQ workers)
+- `backend/src/api/v1/`: `stress_test.py`, `inbox.py`
+- `frontend/src/pages/`: `Performance/`, `Inbox/`
 
 ## Complexity Tracking
 
-No constitution violations were identified that require formal justification. The feature is aligned with the existing architectural constraints and the current repo’s monorepo structure.
+> **Fill ONLY if Constitution Check has violations that must be justified**
+
+| Violation | Why Needed | Simpler Alternative Rejected Because |
+|-----------|------------|-------------------------------------|
+| Removal of pgvector | Explicit user request to simplify infra. | String similarity is sufficient and easier to maintain for this specific MVP scope. |
