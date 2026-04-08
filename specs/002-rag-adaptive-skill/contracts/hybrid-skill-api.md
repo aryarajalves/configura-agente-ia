@@ -1,35 +1,36 @@
 # API Contract: Hybrid Skill Management
 
-## POST /v1/skills
+## POST /api/v1/skills
 Create a new skill.
 
 Request:
 ```json
 {
   "name": "Habilidade Híbrida de Produtos",
-  "description": "Combina documentos e dados de preço por product_id",
-  "type": "hibrida"
+  "description": "Combina documentos e dados de preço",
+  "target_table": "products"
 }
 ```
 
 Response:
 ```json
 {
-  "skill_id": "uuid",
-  "status": "draft"
+  "id": "uuid",
+  "name": "Habilidade Híbrida de Produtos",
+  "active_version_id": null
 }
 ```
 
-## POST /v1/skills/{skill_id}/sources
-Register a source for a skill version and start ingestion.
+## POST /api/v1/skills/{skill_id}/sources
+Register a static source.
 
 Request:
 ```json
 {
   "source_type": "pdf",
-  "source_uri": "s3://bucket/file.pdf",
-  "metadata": {
-    "filename": "manual.pdf"
+  "uri": "s3://bucket/file.pdf",
+  "metadata_": {
+    "product_id": "ABC123"
   }
 }
 ```
@@ -37,67 +38,84 @@ Request:
 Response:
 ```json
 {
+  "id": "uuid",
   "skill_version_id": "uuid",
-  "ingestion_status": "processing"
+  "source_type": "pdf",
+  "uri": "s3://bucket/file.pdf"
 }
 ```
 
-## GET /v1/skills/{skill_id}/status
-Retrieve the current status of a skill and its active version.
+## POST /api/v1/skills/{skill_id}/versions
+Triggers ingestion for the latest pending version.
 
 Response:
 ```json
 {
-  "skill_id": "uuid",
-  "status": "active",
-  "active_version_id": "uuid",
-  "version_status": "active",
+  "status": "ingestion_started",
+  "version_id": "uuid",
+  "job_id": "uuid"
+}
+```
+
+## GET /api/v1/skills/{skill_id}/versions/latest
+Retrieve the current status of the latest tracked version.
+
+Response:
+```json
+{
+  "version_id": "uuid",
+  "version_status": "processing",
   "last_processed_at": "2026-04-08T12:00:00Z"
 }
 ```
 
-## POST /v1/skills/{skill_id}/query
+## POST /api/v1/skills/{skill_id}/query
 Run a hybrid query against the active skill version.
 
 Request:
 ```json
 {
-  "question": "Qual é o preço deste item?",
-  "product_id": "ABC123"
+  "query": "Qual é o preço deste item?",
+  "context": {
+    "product_id": "ABC123"
+  }
 }
 ```
 
 Response:
 ```json
 {
-  "answer": "O produto ABC123 custa R$ 199,90 com estoque disponível.",
-  "source_context": "Descrição do produto extraída do documento",
-  "price": 199.90,
-  "stock": 12
+  "answer": "O produto ABC123 custa R$ 99.99 com estoque de 150.",
+  "sources": [
+    {
+      "product_id": "ABC123",
+      "context": "Context extracted from vector"
+    }
+  ],
+  "metadata_": {
+    "price": 99.99,
+    "stock": 150
+  }
 }
 ```
 
-## GET /v1/skills/{skill_id}/versions
-List versions and their statuses.
+## POST /api/v1/skills/{skill_id}/versions/latest/activate
+Activate a fully processed pending version.
 
 Response:
 ```json
 {
-  "versions": [
-    {"version_id": "uuid", "status": "active", "created_at": "..."},
-    {"version_id": "uuid", "status": "processing", "created_at": "..."}
-  ]
+  "status": "activated",
+  "active_version_id": "uuid"
 }
 ```
 
-## POST /v1/skills/{skill_id}/versions/{version_id}/activate
-Activate a pending version after validation.
+## POST /api/v1/skills/{skill_id}/versions/latest/retry
+Retry processing for an errored or attention version.
 
 Response:
 ```json
 {
-  "skill_id": "uuid",
-  "version_id": "uuid",
-  "status": "active"
+  "status": "retry_queued"
 }
 ```
