@@ -42,21 +42,23 @@ taskiq worker backend.src.workers.broker:broker
 
 ### Checar status de skill
 ```bash
-curl http://localhost:8000/v1/skills/\<skill_id\>/status
+curl http://localhost:8000/api/v1/skills/\<skill_id\>/versions/latest
 ```
 
 ### Smoke test de ingestão híbrida
 ```bash
-curl -X POST http://localhost:8000/v1/skills/\<skill_id\>/ingest \
+# 1. Register Source
+curl -X POST http://localhost:8000/api/v1/skills/\<skill_id\>/sources \
   -H "Content-Type: application/json" \
-  -d '{"source_type":"pdf","source_uri":"/tmp/product-guide.pdf"}'
+  -d '{"source_type":"pdf","uri":"/tmp/product-guide.pdf","metadata_":{"product_id": "ABC123"}}'
+
+# 2. Trigger Ingestion Version
+curl -X POST http://localhost:8000/api/v1/skills/\<skill_id\>/versions
 ```
 
 ### Smoke test de consulta híbrida
 ```bash
-curl -X POST http://localhost:8000/v1/skills/\<skill_id\>/query \
+curl -X POST http://localhost:8000/api/v1/skills/\<skill_id\>/query \
   -H "Content-Type: application/json" \
-  -d '{"question":"Qual é o preço deste produto?","product_id":"ABC123"}'
+  -d '{"query":"Qual é o preço deste produto?","context":{"product_id":"ABC123"}}'
 ```
-
-> Ajuste os caminhos de endpoint quando a API final estiver implementada. Estes exemplos refletem o contrato de interface proposto em `contracts/hybrid-skill-api.md`.
