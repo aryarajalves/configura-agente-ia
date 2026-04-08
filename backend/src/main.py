@@ -1,0 +1,21 @@
+from fastapi import FastAPI
+from backend.src.api.v1 import agents, chat, audit
+from backend.src.api.middleware import error_handling_middleware
+from starlette.middleware.base import BaseHTTPMiddleware
+
+app = FastAPI(
+    title="Motor FluxAI API",
+    description="Core Engine for Agent Configuration and Orchestration",
+    version="1.0.0",
+)
+
+app.add_middleware(BaseHTTPMiddleware, dispatch=error_handling_middleware)
+
+# Include routers
+app.include_router(agents.router, prefix="/v1/agents", tags=["Agents"])
+app.include_router(chat.router, prefix="/v1/chat", tags=["Chat"])
+app.include_router(audit.router, prefix="/v1/audit", tags=["Audit"])
+
+@app.get("/")
+async def root():
+    return {"message": "Motor FluxAI Core Engine is running"}

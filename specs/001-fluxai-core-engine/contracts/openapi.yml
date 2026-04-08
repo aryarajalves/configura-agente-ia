@@ -1,0 +1,134 @@
+openapi: 3.0.3
+info:
+  title: Motor FluxAI API
+  description: Core Engine for Agent Configuration and Orchestration
+  version: 1.0.0
+paths:
+  /v1/agents:
+    post:
+      summary: Create a new agent
+      tags: [Agents]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentCreate'
+      responses:
+        '201':
+          description: Created
+  /v1/agents/{id}:
+    get:
+      summary: Get agent configuration
+      tags: [Agents]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agent'
+    patch:
+      summary: Update agent configuration (Locked by Owner)
+      tags: [Agents]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentUpdate'
+      responses:
+        '200':
+          description: Updated
+
+  /v1/chat:
+    post:
+      summary: Send a message to an agent (Orchestration entrypoint)
+      tags: [Chat]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                agent_id: { type: string, format: uuid }
+                thread_id: { type: string }
+                message: { type: string }
+      responses:
+        '200':
+          description: Agent response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  response: { type: string }
+                  usage_metadata: 
+                    type: object
+                    properties:
+                      model_used: { type: string }
+                      latency: { type: number }
+
+  /v1/audit-logs:
+    get:
+      summary: List audit logs (Restricted to SUPERADMIN)
+      tags: [Governance]
+      parameters:
+        - name: agent_id
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: List of audit records
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Agent:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        status: { type: string, enum: [DRAFT, ACTIVE, INACTIVE] }
+        is_locked: { type: boolean }
+        model_fast_id: { type: string }
+        model_analytic_id: { type: string }
+        model_fallback_id: { type: string }
+        routing_thresholds: { type: object }
+        rules_config: { type: object }
+
+    AgentCreate:
+      type: object
+      required: [name, model_fast_id, model_analytic_id]
+      properties:
+        name: { type: string }
+        model_fast_id: { type: string }
+        model_analytic_id: { type: string }
+        model_fallback_id: { type: string }
+
+    AgentUpdate:
+      type: object
+      properties:
+        status: { type: string, enum: [DRAFT, ACTIVE, INACTIVE] }
+        is_locked: { type: boolean }
+        routing_thresholds: { type: object }
+        rules_config: { type: object }
