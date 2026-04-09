@@ -15,6 +15,7 @@ from database import Base
 from models import InteractionLog, AgentConfigModel, ToolModel
 from src.models.stress_test import StressTestPersona, StressTestSession
 from src.models.inbox import InboxItem, BackgroundTask
+from src.models.ingestion import IngestionTask
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

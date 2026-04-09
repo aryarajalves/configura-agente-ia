@@ -342,11 +342,15 @@ async def ping():
     return {"status": "ok", "message": "Backend is reachable"}
 
 from background_tasks import router as background_tasks_router
+from src.api.v1.endpoints.ingestion import router as ingestion_router
+from src.api.ws.ingestion import router as ingestion_ws_router
 
 app.include_router(import_router)
 app.include_router(prompt_lab_router)
 app.include_router(analysis_router)
 app.include_router(background_tasks_router)
+app.include_router(ingestion_router, prefix="/api/v1/ingestion", tags=["ingestion"])
+app.include_router(ingestion_ws_router, prefix="/api/ws/ingestion", tags=["ingestion_ws"])
 
 # Servir arquivos do Widget (JS e CSS)
 app.mount("/static", StaticFiles(directory="widget"), name="static")
