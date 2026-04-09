@@ -22,6 +22,9 @@ import BackgroundTasks from './components/BackgroundTasks';
 import StressTestConfig from './pages/Performance/StressTestConfig';
 import InboxList from './pages/Inbox/InboxList';
 import InboxDetail from './pages/Inbox/InboxDetail';
+import SystemHealth from './pages/monitoring/SystemHealth';
+import AgentCostDetail from './pages/financial/AgentCostDetail';
+import AuditLogPage from './pages/audit/AuditLogPage';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('admin_token'));
@@ -76,12 +79,17 @@ function App() {
                         <Route path="/performance/stress-test" element={<StressTestConfig />} />
                         <Route path="/inbox" element={<InboxList />} />
                         <Route path="/inbox/:id" element={<InboxDetail />} />
+                        <Route path="/finance/costs" element={<AgentCostDetail />} />
+                        <Route path="/monitoring/health" element={<SystemHealth />} />
                     </>
                     )}
 
                     {/* Rota restrita APENAS para Super Admin */}
                     {isSuperAdmin && (
-                      <Route path="/users" element={<UserManagement />} />
+                      <>
+                        <Route path="/users" element={<UserManagement />} />
+                        <Route path="/audit-logs" element={<AuditLogPage />} />
+                      </>
                     )}
 
                     {/* Redirecionar qualquer acesso não autorizado para a Home */}

@@ -47,3 +47,14 @@ async def get_superadmin(current_user: dict = Depends(get_current_user)):
             detail="Permission denied: SUPERADMIN required"
         )
     return current_user
+
+
+async def get_owner_or_superadmin(current_user: dict = Depends(get_current_user)):
+    """Allow access to Owner (SUPERADMIN) or ADMIN roles for monitoring/audit endpoints."""
+    allowed_roles = {AdminRole.SUPERADMIN, AdminRole.ADMIN}
+    if current_user.get("role") not in allowed_roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permission denied: Owner or Admin required"
+        )
+    return current_user
