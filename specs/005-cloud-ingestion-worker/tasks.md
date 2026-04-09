@@ -17,9 +17,9 @@
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Initialize ingestion module structure in `backend/src/`
-- [ ] T002 Install dependencies `b2sdk`, `taskiq[redis]`, `hashlib` in `backend/requirements.txt`
-- [ ] T003 [P] Configure Backblaze B2 environment variables in `.env` and `backend/src/core/config.py`
+- [x] T001 Initialize ingestion module structure in `backend/src/`
+- [x] T002 Install dependencies `b2sdk`, `taskiq[redis]`, `hashlib` in `backend/requirements.txt`
+- [x] T003 [P] Configure Backblaze B2 environment variables in `.env` and `backend/src/core/config.py`
 
 ---
 
@@ -27,11 +27,11 @@
 
 **Purpose**: Core infrastructure that MUST be complete before ANY user story can be implemented
 
-- [ ] T004 Create `IngestionTask` SQLAlchemy model in `backend/src/models/ingestion.py`
-- [ ] T005 Generate and run Alembic migration for `ingestion_tasks` table in `backend/alembic/versions/`
-- [ ] T006 Implement `CloudService` for Backblaze B2 interaction (upload/delete) in `backend/src/services/cloud_service.py`
-- [ ] T007 Configure TaskIQ broker and define `ia-priority` queue with concurrency=1 in `backend/src/tkq/tkq_config.py`
-- [ ] T008 Setup Redis Pub/Sub utility for WebSocket notifications in `backend/src/core/redis_bus.py`
+- [x] T004 Create `IngestionTask` SQLAlchemy model in `backend/src/models/ingestion.py`
+- [x] T005 Generate and run Alembic migration for `ingestion_tasks` table in `backend/alembic/versions/`
+- [x] T006 Implement `CloudService` for Backblaze B2 interaction (upload/delete) in `backend/src/services/cloud_service.py`
+- [x] T007 Configure TaskIQ broker and define `ia-priority` queue with concurrency=1 in `backend/src/tkq/tkq_config.py`
+- [x] T008 Setup Redis Pub/Sub utility for WebSocket notifications in `backend/src/core/redis_bus.py`
 
 **Checkpoint**: Foundation ready - user story implementation can now begin
 
@@ -45,11 +45,11 @@
 
 ### Implementation for User Story 1
 
-- [ ] T009 [P] [US1] Implement SHA256 stream hashing utility in `backend/src/utils/hashing.py`
-- [ ] T010 [US1] Implement `IngestionService.create_task` with duplicate check in `backend/src/services/ingestion_service.py`
-- [ ] T011 [US1] Create TaskIQ task `task_upload_to_b2` in `backend/src/tkq/tasks.py`
-- [ ] T012 [US1] Implement `POST /api/v1/ingestion/upload` endpoint in `backend/src/api/v1/endpoints/ingestion.py`
-- [ ] T013 [US1] Integrate `IngestionService` with `task_upload_to_b2` for async execution
+- [x] T009 [P] [US1] Implement SHA256 stream hashing utility in `backend/src/utils/hashing.py`
+- [x] T010 [US1] Implement `IngestionService.create_task` with duplicate check in `backend/src/services/ingestion_service.py`
+- [x] T011 [US1] Create TaskIQ task `task_upload_to_b2` in `backend/src/tkq/tasks.py`
+- [x] T012 [US1] Implement `POST /api/v1/ingestion/upload` endpoint in `backend/src/api/v1/endpoints/ingestion.py`
+- [x] T013 [US1] Integrate `IngestionService` with `task_upload_to_b2` for async execution
 
 **Checkpoint**: User Story 1 functional - Files are uploaded to B2 in background.
 
@@ -63,12 +63,12 @@
 
 ### Implementation for User Story 2
 
-- [ ] T014 [P] [US2] Implement WebSocket endpoint for task monitoring in `backend/src/api/ws/ingestion.py`
-- [ ] T015 [US2] Update `task_upload_to_b2` to publish progress increments to Redis Pub/Sub
-- [ ] T016 [US2] Create secondary TaskIQ task `task_process_ia` on `ia-priority` queue in `backend/src/tkq/tasks.py`
-- [ ] T017 [US2] Implement state transition from `uploading` to `processing` and finally `completed`
-- [ ] T018 [US2] Add logic to delete file from B2 upon successful RAG update in `backend/src/tkq/tasks.py`
-- [ ] T019 [US2] Implement detailed log capture within `IngestionTask.logs` JSON field
+- [x] T014 [P] [US2] Implement WebSocket endpoint for task monitoring in `backend/src/api/ws/ingestion.py`
+- [x] T015 [US2] Update `task_upload_to_b2` to publish progress increments to Redis Pub/Sub
+- [x] T016 [US2] Create secondary TaskIQ task `task_process_ia` on `ia-priority` queue in `backend/src/tkq/tasks.py`
+- [x] T017 [US2] Implement state transition from `uploading` to `processing` and finally `completed`
+- [x] T018 [US2] Add logic to delete file from B2 upon successful RAG update in `backend/src/tkq/tasks.py`
+- [x] T019 [US2] Implement detailed log capture within `IngestionTask.logs` JSON field
 
 **Checkpoint**: User Story 2 functional - Real-time monitoring and full lifecycle cleanup complete.
 
@@ -78,10 +78,10 @@
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T020 [P] Implement retry logic for failed B2 uploads in `backend/src/tkq/tasks.py`
-- [ ] T021 Comprehensive unit tests for `IngestionService` (duplicate detection, state machine)
-- [ ] T022 [P] Update API documentation (Swagger) with new ingestion endpoints
-- [ ] T023 Run validation against `quickstart.md` scenarios
+- [x] T020 [P] Implement retry logic for failed B2 uploads in `backend/src/tkq/tasks.py`
+- [x] T021 Comprehensive unit tests for `IngestionService` (duplicate detection, state machine)
+- [x] T022 [P] Update API documentation (Swagger) with new ingestion endpoints
+- [x] T023 Run validation against `quickstart.md` scenarios
 
 ---
 

@@ -3,7 +3,10 @@ import uuid
 from datetime import datetime
 from sqlalchemy import Column, String, Integer, JSON, Enum, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
-from backend.src.database import Base
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from database import Base
 
 class StressTestStatus(str, enum.Enum):
     QUEUED = "queued"
