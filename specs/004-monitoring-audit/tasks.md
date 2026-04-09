@@ -6,11 +6,11 @@
 
 **Purpose**: Create the initial backend and frontend modules for monitoring, finance, and audit governance.
 
-- [ ] T001 [P] Create backend API module stubs in `backend/src/api/v1/finance.py`, `backend/src/api/v1/system_settings.py`, and `backend/src/api/v1/metrics.py`
-- [ ] T002 [P] Create backend service module stubs in `backend/src/services/finance_service.py`, `backend/src/services/settings_service.py`, and `backend/src/services/monitoring_service.py`
-- [ ] T003 [P] Create backend data model stubs in `backend/src/models/financial_record.py`, `backend/src/models/system_settings.py`, `backend/src/models/cleanup_job.py`, and `backend/src/models/container_health_metric.py`
-- [ ] T004 [P] Create frontend page stubs in `frontend/src/pages/financial/AgentCostDetail.tsx`, `frontend/src/pages/monitoring/SystemHealth.tsx`, and `frontend/src/pages/audit/AuditLogPage.tsx`
-- [ ] T005 [P] Add new frontend service stubs in `frontend/src/services/financeService.ts`, `frontend/src/services/monitoringService.ts`, and `frontend/src/services/auditService.ts`
+- [X] T001 [P] Create backend API module stubs in `backend/src/api/v1/finance.py`, `backend/src/api/v1/system_settings.py`, and `backend/src/api/v1/metrics.py`
+- [X] T002 [P] Create backend service module stubs in `backend/src/services/finance_service.py`, `backend/src/services/settings_service.py`, and `backend/src/services/monitoring_service.py`
+- [X] T003 [P] Create backend data model stubs in `backend/src/models/financial_record.py`, `backend/src/models/system_settings.py`, `backend/src/models/cleanup_job.py`, and `backend/src/models/container_health_metric.py`
+- [X] T004 [P] Create frontend page stubs in `frontend/src/pages/financial/AgentCostDetail.tsx`, `frontend/src/pages/monitoring/SystemHealth.tsx`, and `frontend/src/pages/audit/AuditLogPage.tsx`
+- [X] T005 [P] Add new frontend service stubs in `frontend/src/services/financeService.ts`, `frontend/src/services/monitoringService.ts`, and `frontend/src/services/auditService.ts`
 
 ---
 
@@ -18,18 +18,18 @@
 
 **Purpose**: Implement the shared backend data structures, routing, and authorization that all user stories depend on.
 
-- [ ] T006 Extend `backend/src/models/audit.py` to support `target_entity_type`, `target_entity_id`, and `deleted_user_display` fields for deleted-user audit preservation
-- [ ] T007 Implement relational persistence in `backend/src/models/financial_record.py` for financial records and estimated cost tracking
-- [ ] T008 Implement relational persistence in `backend/src/models/system_settings.py` for retention and alert configuration
-- [ ] T009 Implement relational persistence in `backend/src/models/cleanup_job.py` for background cleanup task state and retry tracking
-- [ ] T010 Implement relational persistence in `backend/src/models/container_health_metric.py` for container disk and memory health history
-- [ ] T011 Create an Alembic migration file in `backend/alembic/versions/` for the new monitoring/audit schema additions
-- [ ] T012 Implement system settings read and update operations in `backend/src/services/settings_service.py`
-- [ ] T013 Implement finance aggregation and token-based cost estimation in `backend/src/services/finance_service.py`
-- [ ] T014 Implement container health and disk alert logic in `backend/src/services/monitoring_service.py`
-- [ ] T015 Extend `backend/src/api/auth.py` or existing auth dependencies to ensure Owner/SUPERADMIN access control is available to monitoring and audit endpoints
-- [ ] T016 Register the new routers in `backend/src/main.py` for finance, system settings, and metrics endpoints
-- [ ] T017 Update `backend/src/api/v1/audit.py` to support authorization, result ordering, and eventual filtering extension points
+- [X] T006 Extend `backend/src/models/audit.py` to support `target_entity_type`, `target_entity_id`, and `deleted_user_display` fields for deleted-user audit preservation
+- [X] T007 Implement relational persistence in `backend/src/models/financial_record.py` for financial records and estimated cost tracking
+- [X] T008 Implement relational persistence in `backend/src/models/system_settings.py` for retention and alert configuration
+- [X] T009 Implement relational persistence in `backend/src/models/cleanup_job.py` for background cleanup task state and retry tracking
+- [X] T010 Implement relational persistence in `backend/src/models/container_health_metric.py` for container disk and memory health history
+- [X] T011 Create an Alembic migration file in `backend/alembic/versions/` for the new monitoring/audit schema additions
+- [X] T012 Implement system settings read and update operations in `backend/src/services/settings_service.py`
+- [X] T013 Implement finance aggregation and token-based cost estimation in `backend/src/services/finance_service.py`
+- [X] T014 Implement container health and disk alert logic in `backend/src/services/monitoring_service.py`
+- [X] T015 Extend `backend/src/api/auth.py` or existing auth dependencies to ensure Owner/SUPERADMIN access control is available to monitoring and audit endpoints
+- [X] T016 Register the new routers in `backend/src/main.py` for finance, system settings, and metrics endpoints
+- [X] T017 Update `backend/src/api/v1/audit.py` to support authorization, result ordering, and eventual filtering extension points
 
 ---
 
@@ -39,15 +39,15 @@
 
 **Independent Test**: Update retention settings and verify a cleanup TaskIQ job is scheduled and removes entries older than the configured period without blocking chat requests.
 
-- [ ] T018 [US1] Implement `GET /v1/system/settings` in `backend/src/api/v1/system_settings.py` to return current retention and alert configuration
-- [ ] T019 [US1] Implement `PATCH /v1/system/settings` in `backend/src/api/v1/system_settings.py` to update `Retention_Period_Days` and `Storage_Threshold_Alert`
-- [ ] T020 [US1] Implement a TaskIQ cleanup task in `backend/src/workers/cleanup.py` that removes audit logs and temporary records older than the retention period
-- [ ] T020A [US1] Define and schedule the daily TaskIQ cleanup job recurrence in `backend/src/workers/cleanup.py` and `backend/src/services/settings_service.py`
-- [ ] T021 [US1] Implement cleanup job state tracking in `backend/src/models/cleanup_job.py` and persistence updates from `backend/src/workers/cleanup.py`
-- [ ] T021A [US1] Track consecutive cleanup failures and notify the Dono after 3 failed runs in `backend/src/models/cleanup_job.py` and `backend/src/workers/cleanup.py`
-- [ ] T022 [US1] Implement disk usage polling and threshold alert generation in `backend/src/workers/container_health.py` for the Docker container
-- [ ] T023 [US1] Implement `GET /v1/system/metrics` in `backend/src/api/v1/metrics.py` to expose `disk_usage_percent`, `memory_usage_percent`, and available bytes
-- [ ] T024 [US1] Implement frontend system health and retention settings views in `frontend/src/pages/monitoring/SystemHealth.tsx` and wire them to `frontend/src/services/monitoringService.ts`
+- [X] T018 [US1] Implement `GET /v1/system/settings` in `backend/src/api/v1/system_settings.py` to return current retention and alert configuration
+- [X] T019 [US1] Implement `PATCH /v1/system/settings` in `backend/src/api/v1/system_settings.py` to update `Retention_Period_Days` and `Storage_Threshold_Alert`
+- [X] T020 [US1] Implement a TaskIQ cleanup task in `backend/src/workers/cleanup.py` that removes audit logs and temporary records older than the retention period
+- [X] T020A [US1] Define and schedule the daily TaskIQ cleanup job recurrence in `backend/src/workers/cleanup.py` and `backend/src/services/settings_service.py`
+- [X] T021 [US1] Implement cleanup job state tracking in `backend/src/models/cleanup_job.py` and persistence updates from `backend/src/workers/cleanup.py`
+- [X] T021A [US1] Track consecutive cleanup failures and notify the Dono after 3 failed runs in `backend/src/models/cleanup_job.py` and `backend/src/workers/cleanup.py`
+- [X] T022 [US1] Implement disk usage polling and threshold alert generation in `backend/src/workers/container_health.py` for the Docker container
+- [X] T023 [US1] Implement `GET /v1/system/metrics` in `backend/src/api/v1/metrics.py` to expose `disk_usage_percent`, `memory_usage_percent`, and available bytes
+- [X] T024 [US1] Implement frontend system health and retention settings views in `frontend/src/pages/monitoring/SystemHealth.tsx` and wire them to `frontend/src/services/monitoringService.ts`
 
 ---
 
@@ -57,12 +57,12 @@
 
 **Independent Test**: View the financial dashboard, select an agent, and confirm the detail page shows skill-level token counts and estimated cost data.
 
-- [ ] T025 [US2] Implement `GET /v1/finance/summary` in `backend/src/api/v1/finance.py` to return total cost, token volume, service breakdown, and daily trend
-- [ ] T026 [US2] Implement `GET /v1/finance/agent/{agent_id}` in `backend/src/api/v1/finance.py` to return per-agent cost details by skill and type
-- [ ] T027 [US2] Implement `GET /v1/finance/export` in `backend/src/api/v1/finance.py` to export filtered financial records as CSV
-- [ ] T028 [US2] Implement frontend finance dashboard and agent detail views in `frontend/src/pages/financial/AgentCostDetail.tsx` and `frontend/src/services/financeService.ts`
-- [ ] T029 [US2] Implement CSV export integration in `frontend/src/services/financeService.ts` and link it from the finance dashboard UI
-- [ ] T030 [US2] Wire token-based cost estimation from `backend/router_import.py` pricing rules into `backend/src/services/finance_service.py` for dashboard accuracy
+- [X] T025 [US2] Implement `GET /v1/finance/summary` in `backend/src/api/v1/finance.py` to return total cost, token volume, service breakdown, and daily trend
+- [X] T026 [US2] Implement `GET /v1/finance/agent/{agent_id}` in `backend/src/api/v1/finance.py` to return per-agent cost details by skill and type
+- [X] T027 [US2] Implement `GET /v1/finance/export` in `backend/src/api/v1/finance.py` to export filtered financial records as CSV
+- [X] T028 [US2] Implement frontend finance dashboard and agent detail views in `frontend/src/pages/financial/AgentCostDetail.tsx` and `frontend/src/services/financeService.ts`
+- [X] T029 [US2] Implement CSV export integration in `frontend/src/services/financeService.ts` and link it from the finance dashboard UI
+- [X] T030 [US2] Wire token-based cost estimation from `backend/router_import.py` pricing rules into `backend/src/services/finance_service.py` for dashboard accuracy
 
 ---
 
@@ -72,11 +72,11 @@
 
 **Independent Test**: Filter audit logs by date or user and confirm the returned entries include user name, action, timestamp, and deleted-user display values.
 
-- [ ] T031 [US3] Extend `backend/src/api/v1/audit.py` to support query parameters `start_date`, `end_date`, `user_id`, and `action`
-- [ ] T032 [US3] Implement audit log ordering and pagination in `backend/src/api/v1/audit.py`
-- [ ] T033 [US3] Implement deleted-user display preservation in `backend/src/models/audit.py` and audit query logic
-- [ ] T034 [US3] Implement frontend audit log page and filtering UI in `frontend/src/pages/audit/AuditLogPage.tsx` and `frontend/src/services/auditService.ts`
-- [ ] T035 [US3] Implement deleted-user display preservation and state-empty/error handling in the audit UI for no-results and filter-miss cases
+- [X] T031 [US3] Extend `backend/src/api/v1/audit.py` to support query parameters `start_date`, `end_date`, `user_id`, and `action`
+- [X] T032 [US3] Implement audit log ordering and pagination in `backend/src/api/v1/audit.py`
+- [X] T033 [US3] Implement deleted-user display preservation in `backend/src/models/audit.py` and audit query logic
+- [X] T034 [US3] Implement frontend audit log page and filtering UI in `frontend/src/pages/audit/AuditLogPage.tsx` and `frontend/src/services/auditService.ts`
+- [X] T035 [US3] Implement deleted-user display preservation and state-empty/error handling in the audit UI for no-results and filter-miss cases
 
 ---
 
@@ -84,13 +84,13 @@
 
 **Purpose**: Final integration, documentation, and deployment-ready cleanup.
 
-- [ ] T036 [P] Update `backend/src/main.py` route registration and ensure new endpoints are documented in OpenAPI
-- [ ] T037 [P] Update `specs/004-monitoring-audit/quickstart.md` with the execution steps for new monitoring and audit flows
-- [ ] T038 [P] Update `specs/004-monitoring-audit/contracts/api-contracts.md` with final endpoint contract details and request/response shapes
-- [ ] T039 [P] Update `backend/src/services/finance_service.py` and `backend/src/services/settings_service.py` to add logging of critical events for governance auditability
-- [ ] T040 [P] Review and refactor `backend/src/workers/cleanup.py` and `backend/src/workers/container_health.py` for TaskIQ retry and error reporting behavior
-- [ ] T041 [P] Confirm all new frontend modules are imported and wired in the application navigation or dashboard routes
-- [ ] T042 [P] Validate the new feature by following `specs/004-monitoring-audit/quickstart.md` end-to-end
+- [X] T036 [P] Update `backend/src/main.py` route registration and ensure new endpoints are documented in OpenAPI
+- [X] T037 [P] Update `specs/004-monitoring-audit/quickstart.md` with the execution steps for new monitoring and audit flows
+- [X] T038 [P] Update `specs/004-monitoring-audit/contracts/api-contracts.md` with final endpoint contract details and request/response shapes
+- [X] T039 [P] Update `backend/src/services/finance_service.py` and `backend/src/services/settings_service.py` to add logging of critical events for governance auditability
+- [X] T040 [P] Review and refactor `backend/src/workers/cleanup.py` and `backend/src/workers/container_health.py` for TaskIQ retry and error reporting behavior
+- [X] T041 [P] Confirm all new frontend modules are imported and wired in the application navigation or dashboard routes
+- [X] T042 [P] Validate the new feature by following `specs/004-monitoring-audit/quickstart.md` end-to-end
 
 ---
 
