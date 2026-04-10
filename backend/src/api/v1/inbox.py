@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.src.database import get_db
-from backend.src.services.inbox_service import InboxService
-from backend.src.api.auth import get_current_user
-from backend.src.models.schemas import SuccessResponse
-from backend.src.models.inbox import InboxItemStatus
-from backend.src.models.admin import AdminRole
+from src.database import get_db
+from src.services.inbox_service import InboxService
+from src.api.auth import get_current_user
+from src.models.schemas import SuccessResponse
+from src.models.inbox import InboxItemStatus
+from src.models.admin import AdminRole
 from uuid import UUID
 from pydantic import BaseModel
 from typing import List, Optional

@@ -1,9 +1,9 @@
 import pytest
 import uuid
 from sqlalchemy import select
-from backend.src.services.inbox_service import InboxService
-from backend.src.models.inbox import InboxItem, InboxItemStatus
-from backend.src.models.skill import Skill, SkillVersion, SkillType, SkillStatus, VectorChunk
+from src.services.inbox_service import InboxService
+from src.models.inbox import InboxItem, InboxItemStatus
+from src.models.skill import Skill, SkillVersion, SkillType, SkillStatus, VectorChunk
 
 @pytest.mark.asyncio
 async def test_discard_and_block_logic(db_session):
@@ -33,7 +33,7 @@ async def test_discard_and_block_logic(db_session):
 
 @pytest.mark.asyncio
 async def test_rag_versioned_correction(db_session):
-    from backend.src.services.rag_service_v2 import RAGServiceV2
+    from src.services.rag_service_v2 import RAGServiceV2
     from unittest.mock import patch, AsyncMock
     
     # 1. Setup Skill
@@ -49,7 +49,7 @@ async def test_rag_versioned_correction(db_session):
     service = RAGServiceV2(db_session)
     
     # Mock embedding since we don't want real API call
-    with patch("backend.src.services.rag_service.RAGService.get_embedding", new_callable=AsyncMock) as mock_emb:
+    with patch("src.services.rag_service.RAGService.get_embedding", new_callable=AsyncMock) as mock_emb:
         mock_emb.return_value = [0.1] * 1536
         
         await service.apply_correction_to_rag(

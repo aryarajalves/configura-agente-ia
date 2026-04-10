@@ -2,7 +2,7 @@ import enum
 from datetime import datetime
 from sqlalchemy import Column, String, Enum, DateTime, UUID, Boolean, ForeignKey, JSON
 import uuid
-from backend.src.database import Base
+from src.database import Base
 
 class AgentStatus(str, enum.Enum):
     DRAFT = "DRAFT"

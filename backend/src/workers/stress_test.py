@@ -2,10 +2,10 @@ import uuid
 import logging
 import asyncio
 from typing import Dict, Any
-from backend.src.workers.broker import broker
-from backend.src.database import AsyncSessionLocal
-from backend.src.services.stress_test_service import StressTestService
-from backend.src.models.stress_test import StressTestStatus
+from src.workers.broker import broker
+from src.database import AsyncSessionLocal
+from src.services.stress_test_service import StressTestService
+from src.models.stress_test import StressTestStatus
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +28,9 @@ async def run_stress_test_session(session_id: str, persona_config: Dict[str, Any
             # 3. Detect failures and create Inbox items
             
             # Simulation logic (US1/T009)
-            from backend.src.services.simulation_orchestrator import SimulationOrchestrator
-            from backend.src.services.inbox_service import InboxService
-            from backend.src.models.agent import Agent # To get the first active agent for simulation
+            from src.services.simulation_orchestrator import SimulationOrchestrator
+            from src.services.inbox_service import InboxService
+            from src.models.agent import Agent # To get the first active agent for simulation
             from sqlalchemy import select
             
             # Find the first active agent as target

@@ -3,9 +3,9 @@ from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import text
-from backend.src.models.skill import Skill, SkillType, SkillStatus, SkillVersion
-from backend.src.services.skill_version_service import SkillVersionService
-from backend.src.services.skill_ingestion_service import start_ingestion_job
+from src.models.skill import Skill, SkillType, SkillStatus, SkillVersion
+from src.services.skill_version_service import SkillVersionService
+from src.services.skill_ingestion_service import start_ingestion_job
 
 class SkillService:
     def __init__(self, db: AsyncSession):
@@ -27,6 +27,10 @@ class SkillService:
     async def get_skill(self, skill_id: uuid.UUID) -> Optional[Skill]:
         result = await self.db.execute(select(Skill).filter(Skill.id == skill_id))
         return result.scalars().first()
+
+    async def list_skills(self) -> List[Skill]:
+        result = await self.db.execute(select(Skill))
+        return result.scalars().all()
 
     async def start_ingestion(self, skill_id: uuid.UUID):
         """Creates a pending version and queues ingestion"""

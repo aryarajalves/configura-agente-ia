@@ -37,8 +37,8 @@ function App() {
   };
 
   const userRole = localStorage.getItem('user_role') || 'Usuário';
-  const isSuperAdmin = userRole === 'Super Admin';
-  const isAdmin = userRole === 'Admin';
+  const isSuperAdmin = userRole === 'SUPERADMIN';
+  const isAdmin = userRole === 'ADMIN';
   const isUser = userRole === 'Usuário';
 
   return (

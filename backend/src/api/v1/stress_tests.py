@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.src.database import get_db
-from backend.src.services.stress_test_service import StressTestService
-from backend.src.api.auth import get_superadmin, get_current_user
-from backend.src.models.schemas import SuccessResponse, ErrorResponse
-from backend.src.models.stress_test import StressTestStatus
+from src.database import get_db
+from src.services.stress_test_service import StressTestService
+from src.api.auth import get_superadmin, get_current_user
+from src.models.schemas import SuccessResponse, ErrorResponse
+from src.models.stress_test import StressTestStatus
 from uuid import UUID
 from pydantic import BaseModel
 from typing import List, Optional, Any, Dict

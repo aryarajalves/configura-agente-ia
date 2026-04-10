@@ -1,8 +1,8 @@
 import pytest
 import uuid
-from backend.src.models.stress_test import StressTestPersona
-from backend.src.models.admin import AdminRole
-from backend.src.api.auth import create_access_token
+from src.models.stress_test import StressTestPersona
+from src.models.admin import AdminRole
+from src.api.auth import create_access_token
 
 @pytest.fixture
 def superadmin_token():

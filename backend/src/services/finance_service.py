@@ -9,7 +9,7 @@ from uuid import UUID
 from sqlalchemy import select, func, and_, cast, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.src.models.financial_record import FinancialRecord, FinancialRecordType
+from src.models.financial_record import FinancialRecord, FinancialRecordType
 
 logger = logging.getLogger(__name__)
 

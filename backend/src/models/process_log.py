@@ -4,7 +4,7 @@ from enum import Enum
 from sqlalchemy import Column, String, ForeignKey, DateTime, Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
-from backend.src.models.process import Base, ProcessStep
+from src.models.process import Base, ProcessStep
 
 class LogLevel(str, Enum):
     INFO = "INFO"

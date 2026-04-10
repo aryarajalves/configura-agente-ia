@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from backend.src.models.agent import Agent, AgentStatus
+from src.models.agent import Agent, AgentStatus
 from uuid import UUID
 from typing import List, Optional
 
@@ -49,7 +49,7 @@ class AgentService:
                 )
         
         # FR-010: Audit Log registration
-        from backend.src.models.audit import AuditLog
+        from src.models.audit import AuditLog
         import json
 
         try:

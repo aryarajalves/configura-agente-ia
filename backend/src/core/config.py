@@ -1,10 +1,14 @@
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    b2_key_id: str = ""
-    b2_application_key: str = ""
-    b2_bucket_name: str = "fluxai-ingestion"
-    redis_url: str = "redis://redis:6379/0"
+    s3_access_key_id: str = ""
+    s3_secret_access_key: str = ""
+    s3_bucket_name: str = "agente-s3"
+    s3_region: str = "us-east-1"
+    s3_endpoint_url: str = ""
+    s3_enabled: bool = True
+    
+    rabbitmq_url: str = "amqp://guest:guest@rabbitmq:5672/"
 
     class Config:
         env_file = ".env"

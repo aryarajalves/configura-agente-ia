@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-# In a real implementation: from backend.src.models.process import Process, Base
+# In a real implementation: from src.models.process import Process, Base
 
 async def cleanup_old_processes():
     """

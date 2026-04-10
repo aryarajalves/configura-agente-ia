@@ -5,8 +5,8 @@ from typing import List, Optional, Any, Dict
 from datetime import datetime
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.src.models.stress_test import StressTestPersona, StressTestSession, StressTestStatus
-from backend.src.models.inbox import BackgroundTask, BackgroundTaskType, BackgroundTaskStatus
+from src.models.stress_test import StressTestPersona, StressTestSession, StressTestStatus
+from src.models.inbox import BackgroundTask, BackgroundTaskType, BackgroundTaskStatus
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class StressTestService:
         return session
 
     async def submit_stress_test_task(self, session_id: uuid.UUID):
-        from backend.src.workers.stress_test import run_stress_test_session
+        from src.workers.stress_test import run_stress_test_session
         persona = await self.db.execute(
             select(StressTestPersona)
             .join(StressTestSession)

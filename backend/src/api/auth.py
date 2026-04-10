@@ -1,12 +1,13 @@
+import os
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer
-from backend.src.models.admin import AdminRole, Admin
+from src.models.admin import AdminRole, Admin
 
 # Secret keys and algorithms
-SECRET_KEY = "your-secret-key-here" # Move to env in production
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-here")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
@@ -30,15 +31,19 @@ async def get_current_user(token: str = Depends(security)):
     )
     try:
         payload = jwt.decode(token.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str = payload.get("sub")
+        user_id: str = payload.get("id") or payload.get("sub")
         if user_id is None:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
     
-    # In a real app, fetch user from DB here
-    # For now, return a mock user or similar
-    return {"id": user_id, "role": payload.get("role")}
+    # Return the full payload so email and role are accessible
+    return {
+        "id": user_id,
+        "email": payload.get("email"),
+        "role": payload.get("role"),
+        "name": payload.get("name")
+    }
 
 async def get_superadmin(current_user: dict = Depends(get_current_user)):
     if current_user.get("role") != AdminRole.SUPERADMIN:

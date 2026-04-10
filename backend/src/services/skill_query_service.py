@@ -3,7 +3,7 @@ from typing import Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-from backend.src.models.skill import VectorChunk
+from src.models.skill import VectorChunk
 
 class SkillQueryService:
     def __init__(self, db: AsyncSession):

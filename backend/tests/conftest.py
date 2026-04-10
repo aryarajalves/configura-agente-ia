@@ -23,11 +23,11 @@ os.environ["AGENT_API_KEY"] = "test-api-key"
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.insert(0, PROJECT_ROOT)
 
-from backend.src.main import app
-from backend.src.database import get_db, Base
-from backend.src.models.admin import Admin
-from backend.src.models.agent import Agent
-from backend.src.models.audit import AuditLog
+from src.main import app
+from src.database import get_db, Base
+from src.models.admin import Admin
+from src.models.agent import Agent
+from src.models.audit import AuditLog
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
 @pytest.fixture

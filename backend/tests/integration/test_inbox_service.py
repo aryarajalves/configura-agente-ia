@@ -1,8 +1,8 @@
 import pytest
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.src.services.inbox_service import InboxService
-from backend.src.models.inbox import InboxItemStatus
+from src.services.inbox_service import InboxService
+from src.models.inbox import InboxItemStatus
 
 @pytest.mark.asyncio
 async def test_inbox_grouping_rapidfuzz(db_session: AsyncSession):

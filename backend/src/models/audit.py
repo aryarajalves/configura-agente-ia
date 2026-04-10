@@ -3,7 +3,7 @@
 from datetime import datetime
 from sqlalchemy import Column, String, DateTime, UUID, ForeignKey, JSON
 import uuid
-from backend.src.database import Base
+from src.database import Base
 
 
 class AuditLog(Base):

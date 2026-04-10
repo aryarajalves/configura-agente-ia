@@ -1,5 +1,5 @@
 import logging
-from backend.src.workers.broker import broker
+from src.workers.broker import broker
 import uuid
 
 logger = logging.getLogger(__name__)
@@ -9,7 +9,7 @@ async def ingest_skill_version_task(skill_version_id: str) -> dict:
     """
     TaskIQ background job that processes a hybrid skill version.
     """
-    from backend.src.services.skill_ingestion_service import process_ingestion
+    from src.services.skill_ingestion_service import process_ingestion
     
     logger.info(f"Starting ingestion process for skill_version_id: {skill_version_id}")
     try:

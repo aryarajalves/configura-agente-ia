@@ -1,6 +1,6 @@
 import uuid
 import json
-from backend.src.api.websocket.monitor import manager
+from src.api.websocket.monitor import manager
 
 class BackgroundMonitorService:
     def __init__(self):

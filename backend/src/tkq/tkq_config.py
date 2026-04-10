@@ -1,10 +1,9 @@
-from taskiq_redis import ListQueueBroker
-from taskiq import TaskiqEvents
+from taskiq_aio_pika import AioPikaBroker
 import os
 
-redis_url = os.getenv("STR_REDIS_URL", "redis://localhost:6379/0")
+rabbitmq_url = os.getenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
 
-# Default broker
-broker = ListQueueBroker(
-    redis_url,
-).with_result_backend(redis_url)
+# Default broker using RabbitMQ
+broker = AioPikaBroker(
+    rabbitmq_url,
+)

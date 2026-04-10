@@ -3,27 +3,30 @@ import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
 import logging
+from src.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 class S3Service:
     def __init__(self):
-        self.enabled = os.getenv("S3_ENABLED", "True").lower() == "true"
-        self.endpoint_url = os.getenv("S3_ENDPOINT_URL")
-        self.access_key_id = os.getenv("S3_ACCESS_KEY_ID")
-        self.secret_access_key = os.getenv("S3_SECRET_ACCESS_KEY")
-        self.bucket_name = os.getenv("S3_BUCKET_NAME")
-        self.region = os.getenv("S3_REGION", "us-east-1")
+        self.enabled = settings.s3_enabled
+        self.endpoint_url = settings.s3_endpoint_url
+        self.access_key_id = settings.s3_access_key_id
+        self.secret_access_key = settings.s3_secret_access_key
+        self.bucket_name = settings.s3_bucket_name
+        self.region = settings.s3_region
 
         if self.enabled:
-            self.s3_client = boto3.client(
-                's3',
-                endpoint_url=self.endpoint_url,
-                aws_access_key_id=self.access_key_id,
-                aws_secret_access_key=self.secret_access_key,
-                region_name=self.region,
-                config=Config(signature_version='s3v4')
-            )
+            config_params = {
+                'aws_access_key_id': self.access_key_id,
+                'aws_secret_access_key': self.secret_access_key,
+                'region_name': self.region,
+                'config': Config(signature_version='s3v4')
+            }
+            if self.endpoint_url:
+                config_params['endpoint_url'] = self.endpoint_url
+                
+            self.s3_client = boto3.client('s3', **config_params)
         else:
             self.s3_client = None
 

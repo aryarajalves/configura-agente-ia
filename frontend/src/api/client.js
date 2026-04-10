@@ -3,7 +3,7 @@ import { API_URL, AGENT_API_KEY } from '../config';
 const getHeaders = (options = {}) => {
     const headers = {
         ...(options.headers || {}),
-        'X-API-Key': AGENT_API_KEY,
+        // 'X-API-Key': AGENT_API_KEY,
     };
 
     // Adiciona token se autenticado

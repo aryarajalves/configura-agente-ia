@@ -10,8 +10,8 @@ from typing import Dict, Any, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.src.models.container_health_metric import ContainerHealthMetric
-from backend.src.models.system_settings import SystemSettings
+from src.models.container_health_metric import ContainerHealthMetric
+from src.models.system_settings import SystemSettings
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +125,7 @@ async def persist_health_snapshot(db: AsyncSession, container_id: Optional[str] 
 
 async def check_threshold_alert(db: AsyncSession) -> Optional[str]:
     """Check if disk usage exceeds the configured threshold. Returns alert message or None."""
-    from backend.src.services.settings_service import get_or_create_settings
+    from src.services.settings_service import get_or_create_settings
 
     settings = await get_or_create_settings(db)
     disk = _read_disk_usage()

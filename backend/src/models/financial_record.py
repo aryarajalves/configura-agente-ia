@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Column, String, DateTime, Integer, Numeric, UUID, ForeignKey, Enum
-from backend.src.database import Base
+from src.database import Base
 
 
 class FinancialRecordType(str, enum.Enum):

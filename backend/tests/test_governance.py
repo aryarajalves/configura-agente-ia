@@ -1,9 +1,9 @@
 import pytest
 from httpx import AsyncClient
-from backend.src.models.admin import AdminRole, Admin
-from backend.src.models.agent import Agent, AgentStatus
-from backend.src.models.audit import AuditLog
-from backend.src.api.auth import create_access_token
+from src.models.admin import AdminRole, Admin
+from src.models.agent import Agent, AgentStatus
+from src.models.audit import AuditLog
+from src.api.auth import create_access_token
 from sqlalchemy import select
 import uuid
 

@@ -4,8 +4,8 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.src.models.inbox import InboxItem, InboxItemStatus
-from backend.src.models.skill import VectorChunk # Assuming this exists or will exist
+from src.models.inbox import InboxItem, InboxItemStatus
+from src.models.skill import VectorChunk # Assuming this exists or will exist
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +86,7 @@ class InboxService:
         )
         
         if apply_to_rag:
-            from backend.src.services.rag_service_v2 import RAGServiceV2
+            from src.services.rag_service_v2 import RAGServiceV2
             rag_service = RAGServiceV2(self.db)
             item = await self.get_item(item_id)
             if item:

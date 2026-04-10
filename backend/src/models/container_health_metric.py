@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Column, String, DateTime, Numeric, UUID
-from backend.src.database import Base
+from src.database import Base
 
 
 class ContainerHealthMetric(Base):

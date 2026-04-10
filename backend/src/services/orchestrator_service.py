@@ -2,7 +2,7 @@ import logging
 from typing import Annotated, TypedDict
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from backend.src.database import DATABASE_URL
+from src.database import DATABASE_URL
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +44,9 @@ class OrchestratorService:
         self.builder.add_edge("security", END)
 
     async def route_decision(self, state: AgentState):
-        from backend.src.services.agent_service import AgentService
-        from backend.src.models.agent import AgentStatus
-        from backend.src.database import AsyncSessionLocal
+        from src.services.agent_service import AgentService
+        from src.models.agent import AgentStatus
+        from src.database import AsyncSessionLocal
         from uuid import UUID
 
         agent_id = state.get("agent_id")
@@ -82,9 +82,9 @@ class OrchestratorService:
             }
 
     async def security_guard(self, state: AgentState):
-        from backend.src.services.security_service import SecurityService
-        from backend.src.services.agent_service import AgentService
-        from backend.src.database import AsyncSessionLocal
+        from src.services.security_service import SecurityService
+        from src.services.agent_service import AgentService
+        from src.database import AsyncSessionLocal
         from uuid import UUID
 
         agent_id = state.get("agent_id")
@@ -107,9 +107,9 @@ class OrchestratorService:
         return {"messages": state["messages"], "security_flag": False}
 
     async def call_fast_brain(self, state: AgentState):
-        from backend.src.services.llm_service import llm_service
-        from backend.src.services.agent_service import AgentService
-        from backend.src.database import AsyncSessionLocal
+        from src.services.llm_service import llm_service
+        from src.services.agent_service import AgentService
+        from src.database import AsyncSessionLocal
         from uuid import UUID
         import asyncio
 
@@ -133,9 +133,9 @@ class OrchestratorService:
             raise
 
     async def call_analytic_brain(self, state: AgentState):
-        from backend.src.services.llm_service import llm_service
-        from backend.src.services.agent_service import AgentService
-        from backend.src.database import AsyncSessionLocal
+        from src.services.llm_service import llm_service
+        from src.services.agent_service import AgentService
+        from src.database import AsyncSessionLocal
         from uuid import UUID
         import asyncio
 

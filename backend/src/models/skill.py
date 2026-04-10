@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import Column, String, Enum, DateTime, UUID, ForeignKey, Integer, Text, Numeric, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSON
 import uuid
-from backend.src.database import Base
+from src.database import Base
 from pgvector.sqlalchemy import Vector
 
 class SkillType(str, enum.Enum):

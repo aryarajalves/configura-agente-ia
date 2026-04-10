@@ -1,6 +1,6 @@
 from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse
-from backend.src.models.schemas import SuccessResponse
+from src.models.schemas import SuccessResponse
 import logging
 
 logger = logging.getLogger(__name__)
