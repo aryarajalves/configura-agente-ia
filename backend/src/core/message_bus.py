@@ -9,7 +9,7 @@ rabbitmq_url = os.getenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
 
 class MessageBus:
     """
-    MessageBus using RabbitMQ (aio-pika) as a replacement for RedisBus.
+    MessageBus using RabbitMQ (aio-pika) as a replacement for the legacy RedisBus pattern.
     Uses a TOPIC exchange named 'agente.events'.
     """
     def __init__(self):

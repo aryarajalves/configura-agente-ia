@@ -44,7 +44,7 @@ async def _update_log_status(log_id: int, status: str, progress: int, error_mess
             await db.commit()
 
 @broker.task
-async def task_upload_to_b2(task_id: str, local_path: str, remote_filename: str):
+async def task_upload_to_s3(task_id: str, local_path: str, remote_filename: str):
     async with async_session() as db:
         result = await db.execute(select(IngestionTask).where(IngestionTask.id == task_id))
         task = result.scalars().first()

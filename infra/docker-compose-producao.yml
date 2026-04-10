@@ -52,7 +52,7 @@ services:
     hostname: "{{.Service.Name}}.{{.Task.Slot}}"
     networks:
       - network_swarm_public
-    command: worker src.tkq.tkq_config:broker
+    command: taskiq worker src.tkq.tkq_config:broker
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - RABBITMQ_URL=${RABBITMQ_URL}

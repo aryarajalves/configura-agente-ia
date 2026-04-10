@@ -90,9 +90,9 @@ A fundação técnica do projeto. Definir isso antes evita que o código misture
 - Linguagem: Python
 - Framework principal: FastAPI
 - Banco de dados: PostgreSQL
-- Principais bibliotecas: SQLAlchemy, Celery, Pydantic
+- Principais bibliotecas: SQLAlchemy, TaskIQ, Pydantic
 
-> 💡 Motivo: Projeto backend em Python com FastAPI, PostgreSQL e ferramentas como Celery para background tasks, priorizando simplicidade para equipe pequena.
+> 💡 Motivo: Projeto backend em Python com FastAPI, PostgreSQL e ferramentas como TaskIQ + RabbitMQ para background tasks, priorizando simplicidade para equipe pequena.
 
 ### Onde escrevemos as regras pesadas do app?
 
@@ -306,7 +306,7 @@ O usuário tem que esperar o envio terminar?
 
 - Fila de Background: A tela dá "Sucesso!" na hora, e o e-mail vai para uma fila pra ser enviado escondido pelo servidor. _Vibe:_ Experiência de app premium.
 
-> 💡 Motivo: Projeto usa Celery para background tasks, essencial para processamento de RAG e transcrições.
+> 💡 Motivo: Projeto usa TaskIQ + RabbitMQ para background tasks, essencial para processamento de RAG e transcrições.
 
 ### O App bombou na Home! Como aliviar?
 
