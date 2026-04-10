@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 from sqlalchemy import Column, String, Integer, Enum, DateTime, ForeignKey, Text, Boolean
-from backend.src.database import Base
+from src.database import Base
 
 class InboxItemStatus(str, enum.Enum):
     PENDENTE = "pendente"

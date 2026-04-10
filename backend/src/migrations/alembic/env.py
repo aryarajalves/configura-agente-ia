@@ -4,8 +4,8 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
-from backend.src.database import Base, DATABASE_URL
-from backend.src.models.admin import Admin
+from src.database import Base, DATABASE_URL
+from src.models.admin import Admin
 # Add other models here as they are created
 
 # this is the Alembic Config object, which provides

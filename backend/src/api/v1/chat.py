@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-from backend.src.services.orchestrator_service import OrchestratorService
-from backend.src.models.schemas import SuccessResponse
+from src.services.orchestrator_service import OrchestratorService
+from src.models.schemas import SuccessResponse
 from pydantic import BaseModel
 from typing import List
 
@@ -31,7 +31,7 @@ async def chat(payload: ChatRequest):
         result = await graph.ainvoke(initial_state)
         
         # FR-011: Trigger background persistence
-        from backend.src.workers.tasks import persist_checkpoint_task
+        from src.workers.tasks import persist_checkpoint_task
         await persist_checkpoint_task.kiq({
             "agent_id": payload.agent_id,
             "state": result

@@ -7,10 +7,10 @@ from typing import Optional
 from datetime import date, datetime
 from uuid import UUID
 
-from backend.src.database import get_db
-from backend.src.models.audit import AuditLog
-from backend.src.api.auth import get_superadmin
-from backend.src.models.schemas import SuccessResponse
+from src.database import get_db
+from src.models.audit import AuditLog
+from src.api.auth import get_superadmin
+from src.models.schemas import SuccessResponse
 
 router = APIRouter()
 

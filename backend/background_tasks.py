@@ -4,7 +4,7 @@ from sqlalchemy import select, desc
 import asyncio
 from database import get_db, async_session
 from models import BackgroundProcessLog
-from tasks import process_video_task
+from src.tkq.tasks import process_video_task
 import logging
 
 logger = logging.getLogger(__name__)
@@ -23,11 +23,11 @@ async def start_video_processing(payload: dict, db: AsyncSession = Depends(get_d
     await db.commit()
     await db.refresh(log)
 
-    # 2. Envia para o Celery
-    task = process_video_task.delay(log.id, payload)
+    # 2. Envia para o TaskIQ (RabbitMQ)
+    task = await process_video_task.kiq(log.id, payload)
     
     # Atualiza com o task_id real
-    log.task_id = task.id
+    log.task_id = task.task_id
     await db.commit()
     
     # Retorna Pydantic-compatible dict simulando o log
@@ -70,9 +70,10 @@ async def cancel_task(log_id: int, db: AsyncSession = Depends(get_db)):
     if not log:
         raise HTTPException(status_code=404, detail="Process Log not found")
         
-    from celery_app import app
+    # TaskIQ não suporta revoke nativo por ID sem persistência extra no broker.
+    # Marcaremos apenas no banco como cancelado.
     if log.task_id and log.status in ["PENDENTE", "PROCESSANDO"]:
-        app.control.revoke(log.task_id, terminate=True, signal='SIGKILL')
+        pass # Adicionar lógica de cancelamento distribuído se necessário via MessageBus
         
     log.status = "ERRO"
     log.error_message = "Cancelado pelo usuário"

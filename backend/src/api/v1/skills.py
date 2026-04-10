@@ -3,16 +3,23 @@ from typing import List
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.src.models.schemas.skill_schemas import (
+from src.models.schemas.skill_schemas import (
     SkillCreate, SkillResponse, SkillSourceCreate, SkillSourceResponse,
     SkillStatusResponse, SkillQueryRequest, SkillQueryResponse, SkillVersionListResponse
 )
-from backend.src.api.auth import get_superadmin
-from backend.src.database import get_db
-from backend.src.services.skill_service import SkillService
-from backend.src.services.skill_version_service import SkillVersionService
+from src.api.auth import get_superadmin
+from src.database import get_db
+from src.services.skill_service import SkillService
+from src.services.skill_version_service import SkillVersionService
 
-router = APIRouter(prefix="/skills", tags=["Skills"])
+router = APIRouter()
+
+@router.get("", response_model=List[SkillResponse])
+async def list_skills(admin: dict = Depends(get_superadmin), db: AsyncSession = Depends(get_db)):
+    """List all available skills"""
+    skill_service = SkillService(db)
+    skills = await skill_service.list_skills()
+    return [SkillResponse.model_validate(s) for s in skills]
 
 @router.post("", response_model=SkillResponse, status_code=status.HTTP_201_CREATED)
 async def create_skill(skill_in: SkillCreate, admin: dict = Depends(get_superadmin), db: AsyncSession = Depends(get_db)):
@@ -37,7 +44,7 @@ async def add_source(skill_id: UUID, source_in: SkillSourceCreate, admin: dict =
     version_service = SkillVersionService(db)
     version = await skill_service.start_ingestion(skill_id)
     
-    from backend.src.models.skill import SkillSource
+    from src.models.skill import SkillSource
     import uuid
     # Create the source record linked to the pending version
     new_source = SkillSource(
@@ -88,7 +95,7 @@ async def query_hybrid_skill(skill_id: UUID, query_in: SkillQueryRequest, db: As
     if not product_id:
         raise HTTPException(status_code=400, detail="product_id is missing from query context")
         
-    from backend.src.services.skill_query_service import SkillQueryService
+    from src.services.skill_query_service import SkillQueryService
     query_service = SkillQueryService(db)
     try:
         response_data = await query_service.hybrid_query(skill_id, skill.active_version_id, query_in.query, query_in.context)
@@ -119,8 +126,8 @@ async def activate_version(skill_id: UUID, version_id: UUID, admin: dict = Depen
 @router.post("/{skill_id}/versions/{version_id}/retry")
 async def retry_version(skill_id: UUID, version_id: UUID, admin: dict = Depends(get_superadmin), db: AsyncSession = Depends(get_db)):
     """Retry failed ingestion"""
-    from backend.src.services.skill_ingestion_service import start_ingestion_job
-    from backend.src.models.skill import SkillVersionStatus
+    from src.services.skill_ingestion_service import start_ingestion_job
+    from src.models.skill import SkillVersionStatus
     
     version_service = SkillVersionService(db)
     version = await version_service.get_version(version_id)

@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Column, Integer, DateTime, UUID, ForeignKey
-from backend.src.database import Base
+from src.database import Base
 
 
 class SystemSettings(Base):

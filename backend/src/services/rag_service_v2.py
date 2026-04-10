@@ -5,8 +5,8 @@ from typing import Optional, List
 from datetime import datetime
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.src.models.skill import Skill, SkillVersion, VectorChunk, SkillVersionStatus
-from backend.src.services.rag_service import RAGService
+from src.models.skill import Skill, SkillVersion, VectorChunk, SkillVersionStatus
+from src.services.rag_service import RAGService
 
 logger = logging.getLogger(__name__)
 

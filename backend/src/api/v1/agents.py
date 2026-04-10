@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.src.database import get_db
-from backend.src.services.agent_service import AgentService
-from backend.src.api.auth import get_superadmin
-from backend.src.models.schemas import SuccessResponse, ErrorResponse, AgentSchema
+from src.database import get_db
+from src.services.agent_service import AgentService
+from src.api.auth import get_superadmin
+from src.models.schemas import SuccessResponse, ErrorResponse, AgentSchema
 from uuid import UUID
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 router = APIRouter()
 
@@ -16,7 +16,15 @@ class AgentCreateSchema(BaseModel):
     model_analytic_id: str
     model_fallback_id: Optional[str] = None
 
-@router.post("/", response_model=SuccessResponse)
+@router.get("", response_model=SuccessResponse)
+async def list_agents(
+    db: AsyncSession = Depends(get_db),
+    admin: dict = Depends(get_superadmin)
+):
+    agents = await AgentService.list_agents(db, superadmin_id=admin["id"])
+    return SuccessResponse(data=[AgentSchema.model_validate(a) for a in agents])
+
+@router.post("", response_model=SuccessResponse)
 async def create_agent(
     payload: AgentCreateSchema, 
     db: AsyncSession = Depends(get_db),

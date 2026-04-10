@@ -39,7 +39,7 @@ class SimulationOrchestrator:
         )
 
     async def call_persona(self, state: SimulationState):
-        from backend.src.services.llm_service import llm_service
+        from src.services.llm_service import llm_service
         
         messages = state["messages"]
         persona_config = state["persona_config"]
@@ -64,7 +64,7 @@ class SimulationOrchestrator:
         }
 
     async def call_agent(self, state: SimulationState):
-        from backend.src.services.orchestrator_service import OrchestratorService
+        from src.services.orchestrator_service import OrchestratorService
         
         orchestrator = OrchestratorService()
         compiled = await orchestrator.get_compiled_graph()
@@ -89,7 +89,7 @@ class SimulationOrchestrator:
         }
 
     async def evaluate_interaction(self, state: SimulationState):
-        from backend.src.services.llm_service import llm_service
+        from src.services.llm_service import llm_service
         
         last_agent_msg = state["messages"][-1]["content"] if state["messages"] else ""
         

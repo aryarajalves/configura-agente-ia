@@ -1,9 +1,9 @@
 """Container health worker — disk usage polling and alert generation."""
 
 import logging
-from backend.src.database import AsyncSessionLocal
-from backend.src.services.monitoring_service import persist_health_snapshot, check_threshold_alert
-from backend.src.workers.broker import broker
+from src.database import AsyncSessionLocal
+from src.services.monitoring_service import persist_health_snapshot, check_threshold_alert
+from src.workers.broker import broker
 
 logger = logging.getLogger(__name__)
 

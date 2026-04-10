@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, UUID4, ConfigDict
 from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
-from backend.src.models.skill import SkillType, SkillStatus, SkillVersionStatus, SourceType
+from src.models.skill import SkillType, SkillStatus, SkillVersionStatus, SourceType
 
 class SkillBase(BaseModel):
     name: str

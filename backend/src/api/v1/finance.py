@@ -10,10 +10,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.src.database import get_db
-from backend.src.api.auth import get_owner_or_superadmin
-from backend.src.models.schemas import SuccessResponse
-from backend.src.services.finance_service import (
+from src.database import get_db
+from src.api.auth import get_owner_or_superadmin
+from src.models.schemas import SuccessResponse
+from src.services.finance_service import (
     get_finance_summary,
     get_agent_cost_detail,
     get_records_for_export,

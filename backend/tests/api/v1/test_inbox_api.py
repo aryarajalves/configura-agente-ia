@@ -1,10 +1,10 @@
 import pytest
 import uuid
 from httpx import AsyncClient
-from backend.src.main import app
-from backend.src.api.auth import create_access_token
-from backend.src.models.admin import AdminRole
-from backend.src.models.inbox import InboxItem, InboxItemStatus
+from src.main import app
+from src.api.auth import create_access_token
+from src.models.admin import AdminRole
+from src.models.inbox import InboxItem, InboxItemStatus
 from sqlalchemy.ext.asyncio import AsyncSession
 
 @pytest.mark.asyncio

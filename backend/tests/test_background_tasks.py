@@ -9,15 +9,15 @@ async def test_list_background_tasks(client):
     assert response.status_code == 200
     assert isinstance(response.json(), list)
 
-@patch("background_tasks.process_video_task")
+@patch("src.tkq.tasks.process_video_task.kiq")
 @pytest.mark.asyncio
 async def test_start_video_processing(mock_task, client):
     """Testa o início de um processamento de vídeo em background."""
-    # Mock do método .delay() do Celery
+    # Mock do método .kiq() do TaskIQ
     mock_id = "test-task-123"
     mock_task_obj = MagicMock()
-    mock_task_obj.id = mock_id
-    mock_task.delay.return_value = mock_task_obj
+    mock_task_obj.task_id = mock_id
+    mock_task.return_value = mock_task_obj # kiq is awaited
     
     payload = {
         "video_path": "test_video.mp4",
@@ -58,14 +58,14 @@ async def test_websocket_connection(client):
         # Mas o código acima é o padrão para testar WS em FastAPI com httpx.
         pytest.skip(f"WebSocket testing not supported by current environment: {e}")
 
-@patch("tasks.process_kb_json_item_task")
+@patch("src.tkq.tasks.process_kb_json_item_task.kiq")
 @pytest.mark.asyncio
 async def test_process_json_batch(mock_task, client):
     """Testa o processamento de um lote de itens JSON."""
     mock_id = "test-json-task-456"
     mock_task_obj = MagicMock()
-    mock_task_obj.id = mock_id
-    mock_task.delay.return_value = mock_task_obj
+    mock_task_obj.task_id = mock_id
+    mock_task.return_value = mock_task_obj
     
     payload = [
         {
@@ -90,4 +90,4 @@ async def test_process_json_batch(mock_task, client):
     assert len(data["log_ids"]) == 2
     
     # Verifica se a task foi chamada 2 vezes
-    assert mock_task.delay.call_count == 2
+    assert mock_task.call_count == 2

@@ -5,12 +5,12 @@ import uuid
 from datetime import datetime, timedelta
 
 from sqlalchemy import delete, select, update
-from backend.src.database import AsyncSessionLocal
-from backend.src.models.audit import AuditLog
-from backend.src.models.stress_test import StressTestSession
-from backend.src.models.cleanup_job import CleanupJob, CleanupJobStatus
-from backend.src.models.system_settings import SystemSettings
-from backend.src.workers.broker import broker
+from src.database import AsyncSessionLocal
+from src.models.audit import AuditLog
+from src.models.stress_test import StressTestSession
+from src.models.cleanup_job import CleanupJob, CleanupJobStatus
+from src.models.system_settings import SystemSettings
+from src.workers.broker import broker
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ async def _mark_job_success(db, job: CleanupJob) -> None:
     await db.commit()
 
     # Also stamp last_cleanup_timestamp on system settings
-    from backend.src.services.settings_service import mark_cleanup_completed
+    from src.services.settings_service import mark_cleanup_completed
     await mark_cleanup_completed(db)
 
 
@@ -143,7 +143,7 @@ async def cleanup_old_stress_tests(days_to_keep: int = 30):
 @broker.task
 async def cleanup_old_health_metrics(days_to_keep: int = 30):
     """Purge old container health metrics to control table growth."""
-    from backend.src.models.container_health_metric import ContainerHealthMetric
+    from src.models.container_health_metric import ContainerHealthMetric
 
     cutoff_date = datetime.utcnow() - timedelta(days=days_to_keep)
 

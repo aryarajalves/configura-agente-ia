@@ -2,7 +2,7 @@ import uuid
 import logging
 from typing import List, Any
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.src.models.skill import SourceType, SkillVersionStatus
+from src.models.skill import SourceType, SkillVersionStatus
 
 logger = logging.getLogger(__name__)
 
@@ -10,16 +10,16 @@ async def start_ingestion_job(skill_version_id: uuid.UUID):
     """
     Triggers the TaskIQ background job for a skill version.
     """
-    from backend.src.workers.skill_ingestion import ingest_skill_version_task
+    from src.workers.skill_ingestion import ingest_skill_version_task
     # trigger background task
     await ingest_skill_version_task.kiq(str(skill_version_id))
     logger.info(f"Queued skill ingestion job for {skill_version_id}")
 
-from backend.src.database import get_db
-from backend.src.services.skill_version_service import SkillVersionService
-from backend.src.models.skill import SkillSource
+from src.database import get_db
+from src.services.skill_version_service import SkillVersionService
+from src.models.skill import SkillSource
 from sqlalchemy.future import select
-from backend.src.services.rag_service import RAGService
+from src.services.rag_service import RAGService
 
 async def process_ingestion(skill_version_id: uuid.UUID):
     """Core ingestion loop for a combination of source types including explicit audio/video paths."""

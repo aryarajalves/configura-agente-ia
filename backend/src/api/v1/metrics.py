@@ -2,8 +2,8 @@
 
 from fastapi import APIRouter, Depends
 
-from backend.src.api.auth import get_owner_or_superadmin
-from backend.src.services.monitoring_service import collect_system_metrics
+from src.api.auth import get_owner_or_superadmin
+from src.services.monitoring_service import collect_system_metrics
 
 router = APIRouter()
 

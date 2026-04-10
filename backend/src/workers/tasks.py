@@ -1,5 +1,5 @@
-from backend.src.workers.broker import broker
-from backend.src.database import AsyncSessionLocal
+from src.workers.broker import broker
+from src.database import AsyncSessionLocal
 from sqlalchemy import text
 import logging
 

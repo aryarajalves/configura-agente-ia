@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Column, String, DateTime, Integer, UUID, Enum, Text
-from backend.src.database import Base
+from src.database import Base
 
 
 class CleanupJobStatus(str, enum.Enum):

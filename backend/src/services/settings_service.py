@@ -8,7 +8,7 @@ from typing import Optional
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.src.models.system_settings import SystemSettings
+from src.models.system_settings import SystemSettings
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ async def update_settings(
         "storage_threshold_alert": settings.storage_threshold_alert,
     }
     if previous_state != new_state:
-        from backend.src.models.audit import AuditLog
+        from src.models.audit import AuditLog
         audit_entry = AuditLog(
             id=uuid.uuid4(),
             superadmin_id=updated_by if updated_by else None,

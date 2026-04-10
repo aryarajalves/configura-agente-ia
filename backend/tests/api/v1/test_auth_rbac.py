@@ -1,7 +1,7 @@
 import pytest
 import uuid
-from backend.src.api.auth import create_access_token
-from backend.src.models.admin import AdminRole
+from src.api.auth import create_access_token
+from src.models.admin import AdminRole
 
 @pytest.mark.asyncio
 async def test_inbox_rbac(client):

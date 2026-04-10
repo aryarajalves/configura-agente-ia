@@ -14,8 +14,9 @@ const GlobalContextManager = () => {
     const fetchVariables = async () => {
         try {
             const res = await api.get(`/global-variables`);
-            const data = await res.json();
-            setVariables(data);
+            const json = await res.json();
+            const data = json.data !== undefined ? json.data : json;
+            setVariables(Array.isArray(data) ? data : []);
         } catch (e) {
             console.error("Erro ao buscar variáveis globais", e);
         } finally {

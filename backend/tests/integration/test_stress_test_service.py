@@ -1,8 +1,8 @@
 import pytest
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.src.services.stress_test_service import StressTestService
-from backend.src.models.stress_test import StressTestStatus
+from src.services.stress_test_service import StressTestService
+from src.models.stress_test import StressTestStatus
 
 @pytest.mark.asyncio
 async def test_stress_test_lifecycle(db_session: AsyncSession):

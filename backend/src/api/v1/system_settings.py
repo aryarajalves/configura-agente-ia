@@ -5,10 +5,10 @@ from pydantic import BaseModel, Field
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.src.database import get_db
-from backend.src.api.auth import get_superadmin
-from backend.src.models.schemas import SuccessResponse
-from backend.src.services.settings_service import get_or_create_settings, update_settings
+from src.database import get_db
+from src.api.auth import get_superadmin
+from src.models.schemas import SuccessResponse
+from src.services.settings_service import get_or_create_settings, update_settings
 
 router = APIRouter()
 
@@ -61,3 +61,4 @@ async def patch_system_settings(
         },
         message="Configurações atualizadas com sucesso",
     )
+

@@ -122,19 +122,23 @@ function Dashboard() {
         setLoading(true);
         setError(null);
         try {
-            const [resAgents, resKBs] = await Promise.all([
+            const [resAgents, resSkills] = await Promise.all([
                 api.get('/agents'),
-                api.get('/knowledge-bases')
+                api.get('/skills')
             ]);
 
-            if (!resAgents.ok || !resKBs.ok) {
+            if (!resAgents.ok || !resSkills.ok) {
                 throw new Error("Não foi possível carregar os dados do servidor. O serviço pode estar reiniciando.");
             }
 
-            const agentsData = await resAgents.json();
-            const kbsData = await resKBs.json();
+            const agentsRes = await resAgents.json();
+            const skillsRes = await resSkills.json();
+            
+            const agentsData = agentsRes.data !== undefined ? agentsRes.data : agentsRes;
+            const kbsData = skillsRes.data !== undefined ? skillsRes.data : skillsRes;
 
             if (!Array.isArray(agentsData)) {
+                console.error("Agents data is not an array:", agentsRes);
                 throw new Error("Formato de dados de agentes inválido recebido.");
             }
 
@@ -260,7 +264,7 @@ function Dashboard() {
                         />
                         <StatCard
                             title="Custo Estimado"
-                            value={`R$ ${stats.total_cost.toFixed(2)}`}
+                            value={`R$ ${(stats?.total_cost || 0).toFixed(2)}`}
                             icon="💰"
                             gradient="linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.1))"
                         />

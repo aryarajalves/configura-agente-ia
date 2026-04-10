@@ -3,7 +3,7 @@ import uuid
 import openai
 from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.src.models.skill import VectorChunk
+from src.models.skill import VectorChunk
 
 class RAGService:
     def __init__(self, db: AsyncSession):
