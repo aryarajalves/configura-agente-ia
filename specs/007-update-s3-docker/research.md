@@ -1,16 +1,68 @@
-# Research: S3 Variables and Docker Compose Let
+# Research: Redis to RabbitMQ Migration for 007-update-s3-docker
 
-## 1. Replacing B2 variables with S3 equivalents
-- **Decision:** Replace `B2_KEY_ID`, `B2_APPLICATION_KEY`, and `B2_BUCKET_NAME` with `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, and `S3_BUCKET_NAME` respectively in `.env` templates, `settings` configuration models, and `cloud_service.py` where they are consumed.
-- **Rationale:** Aligns with standard S3-compatible service properties (like AWS S3, MinIO, etc.) instead of being vendor-locked to Backblaze terms structurally. Even though the stack states Backblaze B2, generic S3 names are more standard for S3-compatible APIs like `boto3`.
-- **Alternatives considered:** None, explicitly requested.
+## TaskIQ Broker Migration
 
-## 2. Removing Redis and Adding S3_REGION
-- **Decision:** Delete `STR_REDIS_URL` usage (`redis_bus.py`, `tkq_config.py`, configuration settings). Add support for `S3_REGION`.
-- **Rationale:** User clarified Redis won't be used. We need to introduce the missing S3 variable. Since `redis_bus.py` etc are currently trying to use this, we may need to gut Redis completely if the project drops it, or just drop the variable if we are only changing configuration now. Wait, Constitution says `TaskIQ + RabbitMQ`. So Redis can indeed be safely gutted as it's not the canonical broker. Let's just remove the env var calls.
-- **Alternatives considered:** Keeping Redis for cache; rejected per user clarification.
+### Decision
+Replace `taskiq-redis` with `taskiq-aio-pika`.
 
-## 3. External Postgres Network
-- **Decision:** Remove the `postgres` service from `docker-compose-local.yml`. Add external network `network_swarm_public` logic. Application services will connect through this.
-- **Rationale:** Developer has a local running postgres out of this compose stack on that specific network.
-- **Alternatives considered:** `host.docker.internal` or `network_mode: "host"`, rejected by user.
+### Rationale
+- RabbitMQ is already defined as the canonical message broker in the Constitution.
+- `taskiq-aio-pika` provides a high-performance asynchronous RabbitMQ broker for TaskIQ.
+- Consolidates infrastructure by removing the Redis dependency.
+
+### Alternatives Considered
+- **InMemoryBroker**: Rejected because it doesn't support distributed workers or persistence.
+- **TaskIQ NATS**: Rejected because RabbitMQ is already in use/preferred.
+
+---
+
+## Event Bus Migration (RedisBus to MessageBus)
+
+### Decision
+Implement a `MessageBus` using `aio-pika` to handle Pub/Sub directly via RabbitMQ exchanges.
+
+### Implementation Pattern
+- Create an `Exchange` (e.g., `events.fanout`).
+- `publish` sends a message to the exchange.
+- `subscribe` creates a temporary queue bound to the exchange.
+
+---
+
+## Celery Removal
+
+### Decision
+Migrate all tasks from `backend/tasks.py` to `backend/src/tkq/tasks.py` (or a unified task registry).
+
+### Task Mapping
+| Celery Task | TaskIQ Equivalent |
+|-------------|-------------------|
+| `process_video_task` | `task_process_video` |
+| `process_kb_media_task` | `task_process_kb_media` |
+| `process_kb_json_item_task` | `task_process_kb_json_item` |
+| `delete_old_process_logs_task` | Use TaskIQ scheduler (in-memory or permanent) |
+
+---
+
+## Environment Variable Mapping
+
+### S3 Standardization
+- `B2_KEY_ID` -> `S3_ACCESS_KEY_ID`
+- `B2_APPLICATION_KEY` -> `S3_SECRET_ACCESS_KEY`
+- `B2_BUCKET_NAME` -> `S3_BUCKET_NAME`
+- `STR_REDIS_URL` -> (Removed)
+- `S3_REGION` -> (Added)
+
+### RabbitMQ Standardization
+- `CELERY_BROKER_URL` -> (Removed)
+- `RABBITMQ_URL` -> (Added, e.g., `amqp://guest:guest@rabbitmq:5672/`)
+
+---
+
+## Technical Unknowns Resolved
+
+1. **How to handle periodic tasks without Celery Beat?**
+   - TaskIQ has a `taskiq-redis` scheduler, but since we are removing Redis, we will use a Simple Scheduler or `taskiq-aio-pika`'s capabilities if available, or just a background loop in the main process if acceptable for small tasks like log cleanup.
+2. **FastAPI Lifespan for TaskIQ?**
+   - Must call `broker.startup()` and `broker.shutdown()` in the FastAPI lifespan handler.
+3. **Queue Names?**
+   - TaskIQ defaults to specific queues. We will configure them to match the project's needs (e.g., standard and `json_processing`).

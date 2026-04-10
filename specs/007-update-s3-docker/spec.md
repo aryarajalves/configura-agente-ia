@@ -9,6 +9,9 @@
 ### Session 2026-04-10
 - Q: Why replace STR_REDIS_URL with S3_REGION? → A: Redis will not be used in this project, so the variable is removed/repurposed without breaking anything.
 - Q: How should the Docker containers connect to the locally running Postgres database? → A: Through an external network named `network_swarm_public`.
+- Q: What should replace the Redis broker for TaskIQ, and what happens to Celery/Flower? → A: TaskIQ will use RabbitMQ (taskiq-aio-pika), and Celery/Flower will be completely removed from the project.
+- Q: What should replace the RedisBus (Pub/Sub) mechanism? → A: It will be replaced with a RabbitMQ implementation (via aio-pika).
+- Q: How should we standardize the infrastructure and environment variables? → A: Use a single `RABBITMQ_URL` variable, remove legacy services (Redis, Celery, Flower) from all Docker Compose files, and update dependencies accordingly.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -54,6 +57,11 @@ Developers running their own standalone Postgres database need a local docker-co
 - **FR-004**: System MUST remove references of `STR_REDIS_URL` and establish `S3_REGION` in configuration, as Redis is not used in this project.
 - **FR-005**: The `docker-compose-local.yml` configuration MUST NOT spin up its own PostgreSQL container instance.
 - **FR-006**: The `docker-compose-local.yml` configuration MUST connect to a PostgreSQL instance already running via an external docker network named `network_swarm_public`.
+- **FR-007**: System MUST replace TaskIQ Redis broker with RabbitMQ (taskiq-aio-pika).
+- **FR-008**: System MUST completely remove Celery and Flower dependencies and related code.
+- **FR-009**: System MUST replace the `RedisBus` Pub/Sub implementation with a RabbitMQ-based `MessageBus`.
+- **FR-010**: System MUST standardize the broker connection string variable as `RABBITMQ_URL`.
+- **FR-011**: System MUST remove `redis`, `celery`, and `flower` service definitions from all `docker-compose*.yml` files.
 
 ### Key Entities
 
