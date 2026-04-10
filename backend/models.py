@@ -305,7 +305,7 @@ class BackgroundProcessLog(Base):
     __tablename__ = "background_process_logs"
     
     id = Column(Integer, primary_key=True, index=True)
-    task_id = Column(String, index=True, nullable=True) # Celery task ID
+    task_id = Column(String, index=True, nullable=True) # TaskIQ task ID
     process_name = Column(String, nullable=False) # Ex: "Processamento de Vídeo"
     status = Column(String, default="PENDENTE") # PENDENTE, PROCESSANDO, CONCLUIDO, ERRO
     progress = Column(Integer, default=0) # 0 to 100

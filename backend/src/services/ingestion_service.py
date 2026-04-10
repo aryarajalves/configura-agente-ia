@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from src.models.ingestion import IngestionTask, IngestionStatus
 from src.utils.hashing import calculate_sha256
-from src.tkq.tasks import task_upload_to_b2
+from src.tkq.tasks import task_upload_to_s3
 
 class IngestionService:
     @staticmethod
@@ -34,6 +34,6 @@ class IngestionService:
         await db.refresh(task)
 
         # Kickoff async upload 
-        await task_upload_to_b2.kiq(task.id, file_path, filename)
+        await task_upload_to_s3.kiq(task.id, file_path, filename)
 
         return task.id
