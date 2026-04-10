@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 from src.database import Base, DATABASE_URL
 from src.models.admin import Admin
+from src.models.skill import Skill, SkillVersion, SkillSource, VectorChunk, ProductTable
+from src.models.knowledge_base import KnowledgeBase, KnowledgeBaseVersion, KnowledgeBaseSource
 # Add other models here as they are created
 
 # this is the Alembic Config object, which provides

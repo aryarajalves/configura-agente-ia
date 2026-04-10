@@ -52,12 +52,21 @@ function Financeiro() {
                 api.get(`/financial/report?${params.toString()}`),
                 api.get('/fine-tuning/jobs')
             ]);
-            const reportData = await reportRes.json();
-            const jobsData = await jobsRes.json();
-            setReport(reportData);
-            setFtJobs(Array.isArray(jobsData) ? jobsData : []);
+            const reportData = await reportRes.json().catch(() => null);
+            const jobsData = await jobsRes.json().catch(() => null);
+
+            // Null-safe fallbacks: API may return null, error object, or valid data
+            const safeReport = reportData && Array.isArray(reportData.items)
+                ? reportData
+                : { items: [], grand_total_cost: 0 };
+            const safeJobs = Array.isArray(jobsData) ? jobsData : [];
+
+            setReport(safeReport);
+            setFtJobs(safeJobs);
         } catch (e) {
             console.error("Erro ao carregar relatório:", e);
+            setReport({ items: [], grand_total_cost: 0 });
+            setFtJobs([]);
         } finally {
             setLoading(false);
         }

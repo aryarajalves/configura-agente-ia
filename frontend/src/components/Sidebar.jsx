@@ -105,11 +105,11 @@ const Sidebar = ({ onLogout }) => {
                                         <div className="active-indicator"></div>
                                     </NavLink>
                                     <NavLink
-                                        to="/skills"
+                                        to="/knowledge-bases"
                                         className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
                                     >
                                         <span className="nav-icon">📚</span>
-                                        <span className="nav-label">Skills (Bases)</span>
+                                        <span className="nav-label">Bases de Conhecimento</span>
                                         <div className="active-indicator"></div>
                                     </NavLink>
                                     <NavLink
@@ -145,19 +145,11 @@ const Sidebar = ({ onLogout }) => {
                                         <div className="active-indicator"></div>
                                     </NavLink>
                                     <NavLink
-                                        to="/performance/stress-test"
+                                        to="/fine-tuning"
                                         className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
                                     >
-                                        <span className="nav-icon">⚡</span>
-                                        <span className="nav-label">Teste de Estresse</span>
-                                        <div className="active-indicator"></div>
-                                    </NavLink>
-                                    <NavLink
-                                        to="/inbox"
-                                        className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                                    >
-                                        <span className="nav-icon">📥</span>
-                                        <span className="nav-label">Inbox (Falhas)</span>
+                                        <span className="nav-icon">🎛️</span>
+                                        <span className="nav-label">Fine-Tuning</span>
                                         <div className="active-indicator"></div>
                                     </NavLink>
                                 </>

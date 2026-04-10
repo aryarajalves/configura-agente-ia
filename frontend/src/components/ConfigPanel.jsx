@@ -266,8 +266,14 @@ const ConfigPanel = () => {
                 // Knowledge Bases
                 try {
                     const kbsRes = await api.get('/knowledge-bases');
-                    const kbsData = await kbsRes.json();
-                    setKbList(kbsData || []);
+                    const kbsData = await kbsRes.json().catch(() => null);
+                    // Handle both plain array and SuccessResponse-wrapped {data: [...]}
+                    const kbArray = Array.isArray(kbsData)
+                        ? kbsData
+                        : Array.isArray(kbsData?.data)
+                        ? kbsData.data
+                        : [];
+                    setKbList(kbArray);
                 } catch (err) {
                     console.error("Error fetching KBs:", err);
                     setKbList([]);

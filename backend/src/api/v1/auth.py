@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.database import get_db
 from src.services.auth_service import AuthService
@@ -15,7 +15,7 @@ class LoginRequest(BaseModel):
     password: str
 
 @router.post("/login")
-async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(payload: LoginRequest, response: Response, db: AsyncSession = Depends(get_db)):
     user = await AuthService.authenticate_user(db, payload.email, payload.password)
     if not user:
         raise HTTPException(
@@ -24,6 +24,17 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
         )
     
     token = AuthService.create_access_token({"id": str(user.id), "email": user.email, "role": user.role})
+    
+    # Set persistent HttpOnly cookie (30 days = 2592000 seconds)
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        httponly=True,
+        max_age=60 * 60 * 24 * 30,  # 30 days
+        samesite="lax",
+        secure=False,  # Set True in production behind HTTPS
+    )
+    
     return {
         "token": token,
         "user": {

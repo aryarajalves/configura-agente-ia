@@ -52,10 +52,19 @@ const UserManagement = () => {
         try {
             setLoading(true);
             const response = await api.get('/users');
-            const data = await response.json();
-            setUsers(data);
+            const data = await response.json().catch(() => null);
+
+            // Null-safe: API may return SuccessResponse {data: [...]} or a direct array
+            let users = [];
+            if (Array.isArray(data)) {
+                users = data;
+            } else if (data && Array.isArray(data.data)) {
+                users = data.data;
+            }
+            setUsers(users);
         } catch (error) {
             console.error("Erro ao buscar usuários:", error);
+            setUsers([]);
         } finally {
             setLoading(false);
         }
