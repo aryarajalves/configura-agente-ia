@@ -8,7 +8,7 @@ export const HybridSkillQuery: React.FC<{ skillId: string }> = ({ skillId }) => 
 
   const handleQuery = async () => {
     try {
-      const res = await fetch(`/api/v1/skills/${skillId}/query`, {
+      const res = await fetch(`/api/v1/knowledge-bases/${skillId}/query`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

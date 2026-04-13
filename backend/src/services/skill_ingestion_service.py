@@ -2,7 +2,7 @@ import uuid
 import logging
 from typing import List, Any
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.models.skill import SourceType, SkillVersionStatus
+from src.models.knowledge_base import SourceType, SkillVersionStatus
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ async def start_ingestion_job(skill_version_id: uuid.UUID):
 
 from src.database import get_db
 from src.services.skill_version_service import SkillVersionService
-from src.models.skill import SkillSource
+from src.models.knowledge_base import SkillSource
 from sqlalchemy.future import select
 from src.services.rag_service import RAGService
 

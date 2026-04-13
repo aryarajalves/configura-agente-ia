@@ -12,6 +12,24 @@ class AgentSchema(BaseModel):
     model_fast_id: str
     model_analytic_id: str
     model_fallback_id: Optional[str] = None
+    rules_config: dict = {"blacklist": [], "double_check": False}
+    routing_thresholds: dict = {}
+    
+    # UI and specific rule fields (will be populated from rules_config)
+    description: Optional[str] = None
+    temperature: Optional[float] = None
+    top_p: Optional[float] = None
+    top_k: Optional[int] = None
+    system_prompt: Optional[str] = None
+    context_window: Optional[int] = None
+    knowledge_base_ids: Optional[List[int]] = None
+    tool_ids: Optional[List[int]] = None
+    
+    # Security fields
+    security_pii_filter: Optional[bool] = None
+    security_validator_ia: Optional[bool] = None
+    security_bot_protection: Optional[bool] = None
+    
     created_at: datetime
     updated_at: datetime
 

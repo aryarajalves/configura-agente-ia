@@ -123,7 +123,7 @@ function Financeiro() {
     // Ranking: Top 3 do modo selecionado
     const ranking = useMemo(() => {
         const agentCosts = {};
-        activeRowsData.forEach(item => {
+        (activeRowsData || []).forEach(item => {
             const name = item.agent_name || "Excluído";
             agentCosts[name] = (agentCosts[name] || 0) + item.total_cost;
         });
@@ -136,7 +136,7 @@ function Financeiro() {
     // Dados para o gráfico do modo selecionado
     const chartData = useMemo(() => {
         const dailyTotals = {};
-        activeRowsData.forEach(item => {
+        (activeRowsData || []).forEach(item => {
             dailyTotals[item.date] = (dailyTotals[item.date] || 0) + item.total_cost;
         });
         return Object.entries(dailyTotals)
@@ -149,7 +149,7 @@ function Financeiro() {
 
     // Itens da tabela filtrados e ordenados
     const allTableRows = useMemo(() => {
-        return [...activeRowsData].sort((a, b) => new Date(b.date) - new Date(a.date));
+        return [...(activeRowsData || [])].sort((a, b) => new Date(b.date) - new Date(a.date));
     }, [activeRowsData]);
 
     // Paginação

@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import desc
 
-from src.models.skill import Skill, SkillVersion, SkillVersionStatus, SkillStatus
+from src.models.knowledge_base import Skill, SkillVersion, SkillVersionStatus, SkillStatus
 
 class SkillVersionService:
     def __init__(self, db: AsyncSession):

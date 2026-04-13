@@ -27,5 +27,5 @@ volumes:
 
 networks:
   network_swarm_public:
-    external: true
+    driver: bridge
     name: network_swarm_public

@@ -28,7 +28,7 @@ export const HybridSkillStatus: React.FC<{ skillId: string }> = ({ skillId }) =>
 
   const handleRetry = async () => {
     try {
-      await fetch(`/api/v1/skills/${skillId}/versions/latest/retry`, { method: 'POST' });
+      await fetch(`/api/v1/knowledge-bases/${skillId}/versions/latest/retry`, { method: 'POST' });
       alert("Retry queued!");
     } catch (e) {
       alert("Failed to retry");
@@ -37,7 +37,7 @@ export const HybridSkillStatus: React.FC<{ skillId: string }> = ({ skillId }) =>
 
   const handleActivate = async () => {
     try {
-      await fetch(`/api/v1/skills/${skillId}/versions/latest/activate`, { method: 'POST' });
+      await fetch(`/api/v1/knowledge-bases/${skillId}/versions/latest/activate`, { method: 'POST' });
       alert("Version Activated!");
     } catch (e) {
       alert("Failed to activate");

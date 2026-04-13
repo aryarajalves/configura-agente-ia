@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.inbox import InboxItem, InboxItemStatus
-from src.models.skill import VectorChunk # Assuming this exists or will exist
+from src.models.knowledge_base import VectorChunk # Assuming this exists or will exist
 
 logger = logging.getLogger(__name__)
 

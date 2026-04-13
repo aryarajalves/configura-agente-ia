@@ -124,7 +124,7 @@ function Dashboard() {
         try {
             const [resAgents, resSkills] = await Promise.all([
                 api.get('/agents'),
-                api.get('/skills')
+                api.get('/knowledge-bases')
             ]);
 
             if (!resAgents.ok || !resSkills.ok) {

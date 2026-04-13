@@ -75,6 +75,7 @@ class VectorChunk(Base):
     __tablename__ = "vector_chunks"
     __table_args__ = (
         UniqueConstraint('knowledge_base_version_id', 'product_id', 'chunk_hash', name='uq_vector_chunk_hash'),
+        {"extend_existing": True},
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -93,6 +94,7 @@ class ProductTable(Base):
     Mock/Placeholder ProductTable to test hybrid joins if needed.
     """
     __tablename__ = "products"
+    __table_args__ = {"extend_existing": True}
 
     product_id = Column(String, primary_key=True)
     price = Column(Numeric(10, 2), nullable=True)
@@ -110,3 +112,5 @@ SkillVersionStatus = KnowledgeBaseVersionStatus
 Skill = KnowledgeBase
 SkillVersion = KnowledgeBaseVersion
 SkillSource = KnowledgeBaseSource
+SourceTypeAlias = SourceType # Just in case it's needed
+

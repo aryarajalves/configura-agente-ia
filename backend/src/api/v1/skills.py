@@ -9,29 +9,29 @@ from src.models.schemas.skill_schemas import (
 )
 from src.api.auth import get_superadmin
 from src.database import get_db
-from src.services.skill_service import SkillService
-from src.services.skill_version_service import SkillVersionService
+from src.services.knowledge_base_service import KnowledgeBaseService
+from src.services.knowledge_base_version_service import KnowledgeBaseVersionService
 
 router = APIRouter()
 
 @router.get("", response_model=List[SkillResponse])
 async def list_skills(admin: dict = Depends(get_superadmin), db: AsyncSession = Depends(get_db)):
     """List all available skills"""
-    skill_service = SkillService(db)
+    skill_service = KnowledgeBaseService(db)
     skills = await skill_service.list_skills()
     return [SkillResponse.model_validate(s) for s in skills]
 
 @router.post("", response_model=SkillResponse, status_code=status.HTTP_201_CREATED)
 async def create_skill(skill_in: SkillCreate, admin: dict = Depends(get_superadmin), db: AsyncSession = Depends(get_db)):
     """Create a new hybrid skill"""
-    skill_service = SkillService(db)
+    skill_service = KnowledgeBaseService(db)
     skill = await skill_service.create_hybrid_skill(skill_in.name, skill_in.description)
     return SkillResponse.model_validate(skill)
 
 @router.post("/{skill_id}/sources", status_code=status.HTTP_202_ACCEPTED)
 async def add_source(skill_id: UUID, source_in: SkillSourceCreate, admin: dict = Depends(get_superadmin), db: AsyncSession = Depends(get_db)):
     """Register source and start ingestion"""
-    skill_service = SkillService(db)
+    skill_service = KnowledgeBaseService(db)
     
     # Optional US1 validation of postgres table mapped
     if source_in.metadata_ and source_in.metadata_.get("product_id"):
@@ -41,10 +41,10 @@ async def add_source(skill_id: UUID, source_in: SkillSourceCreate, admin: dict =
         is_valid = await skill_service.validate_target_table(target_table)
         # We won't block here strictly for prototype if validate_target_table returns false since we might not have the table yet
         
-    version_service = SkillVersionService(db)
+    version_service = KnowledgeBaseVersionService(db)
     version = await skill_service.start_ingestion(skill_id)
     
-    from src.models.skill import SkillSource
+    from src.models.knowledge_base import SkillSource
     import uuid
     # Create the source record linked to the pending version
     new_source = SkillSource(
@@ -63,7 +63,7 @@ async def add_source(skill_id: UUID, source_in: SkillSourceCreate, admin: dict =
 @router.get("/{skill_id}/status", response_model=SkillStatusResponse)
 async def get_skill_status(skill_id: UUID, admin: dict = Depends(get_superadmin), db: AsyncSession = Depends(get_db)):
     """Retrieve skill and version status"""
-    skill_service = SkillService(db)
+    skill_service = KnowledgeBaseService(db)
     skill = await skill_service.get_skill(skill_id)
     if not skill:
         raise HTTPException(status_code=404, detail="Skill not found")
@@ -75,7 +75,7 @@ async def get_skill_status(skill_id: UUID, admin: dict = Depends(get_superadmin)
     )
     
     # Get latest version status if any
-    version_service = SkillVersionService(db)
+    version_service = KnowledgeBaseVersionService(db)
     versions = await version_service.list_versions(skill_id)
     if versions:
         response.version_status = versions[0].status
@@ -86,7 +86,7 @@ async def get_skill_status(skill_id: UUID, admin: dict = Depends(get_superadmin)
 @router.post("/{skill_id}/query", response_model=SkillQueryResponse)
 async def query_hybrid_skill(skill_id: UUID, query_in: SkillQueryRequest, db: AsyncSession = Depends(get_db)):
     """Run a hybrid query"""
-    skill_service = SkillService(db)
+    skill_service = KnowledgeBaseService(db)
     skill = await skill_service.get_skill(skill_id)
     if not skill or not skill.active_version_id:
         raise HTTPException(status_code=404, detail="Skill or active version not found")
@@ -110,14 +110,14 @@ async def query_hybrid_skill(skill_id: UUID, query_in: SkillQueryRequest, db: As
 @router.get("/{skill_id}/versions", response_model=SkillVersionListResponse)
 async def list_versions(skill_id: UUID, admin: dict = Depends(get_superadmin), db: AsyncSession = Depends(get_db)):
     """List all versions"""
-    version_service = SkillVersionService(db)
+    version_service = KnowledgeBaseVersionService(db)
     versions = await version_service.list_versions(skill_id)
     return SkillVersionListResponse(versions=versions)
 
 @router.post("/{skill_id}/versions/{version_id}/activate")
 async def activate_version(skill_id: UUID, version_id: UUID, admin: dict = Depends(get_superadmin), db: AsyncSession = Depends(get_db)):
     """Activate a pending version"""
-    version_service = SkillVersionService(db)
+    version_service = KnowledgeBaseVersionService(db)
     result = await version_service.activate_version(skill_id, version_id)
     if not result:
         raise HTTPException(status_code=404, detail="Version or Skill not found")
@@ -127,9 +127,9 @@ async def activate_version(skill_id: UUID, version_id: UUID, admin: dict = Depen
 async def retry_version(skill_id: UUID, version_id: UUID, admin: dict = Depends(get_superadmin), db: AsyncSession = Depends(get_db)):
     """Retry failed ingestion"""
     from src.services.skill_ingestion_service import start_ingestion_job
-    from src.models.skill import SkillVersionStatus
+    from src.models.knowledge_base import SkillVersionStatus
     
-    version_service = SkillVersionService(db)
+    version_service = KnowledgeBaseVersionService(db)
     version = await version_service.get_version(version_id)
     if not version or version.skill_id != skill_id:
         raise HTTPException(status_code=404, detail="Version not found")

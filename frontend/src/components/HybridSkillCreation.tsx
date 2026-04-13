@@ -11,7 +11,7 @@ export const HybridSkillCreation: React.FC = () => {
 
   const createSkill = async () => {
     try {
-      const res = await fetch('/api/v1/skills', {
+      const res = await fetch('/api/v1/knowledge-bases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, description, type: 'hibrida' })
@@ -30,7 +30,7 @@ export const HybridSkillCreation: React.FC = () => {
     try {
       // Dummy flow for Phase 1 - US1
       // Assuming a real endpoint handles multipart or presigned URLs
-      await fetch(`/api/v1/skills/${skillId}/sources`, {
+      await fetch(`/api/v1/knowledge-bases/${skillId}/sources`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

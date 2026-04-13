@@ -15,7 +15,7 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = '008_rename_skills_to_knowledge_bases'
+revision = '008_skills_to_kbs'
 down_revision = None
 branch_labels = None
 depends_on = None

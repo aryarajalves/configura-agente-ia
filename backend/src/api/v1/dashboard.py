@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.database import get_db
 from src.api.auth import get_owner_or_superadmin
 from src.models.agent import Agent, AgentStatus
-from src.models.skill import Skill
+from src.models.knowledge_base import KnowledgeBase
 from src.models.financial_record import FinancialRecord
 
 router = APIRouter()
@@ -20,8 +20,8 @@ async def get_dashboard_stats(
     )
     total_agents = result_agents.scalar() or 0
 
-    # Count skills
-    result_skills = await db.execute(select(func.count(Skill.id)))
+    # Count knowledge bases
+    result_skills = await db.execute(select(func.count(KnowledgeBase.id)))
     total_knowledge_bases = result_skills.scalar() or 0
 
     # Total interactions (placeholder for now if not implemented)

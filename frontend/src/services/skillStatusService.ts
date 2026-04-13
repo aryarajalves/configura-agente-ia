@@ -12,7 +12,7 @@ export const skillStatusService = {
    * @param skillId UUID of the skill
    */
   async getStatus(skillId: string): Promise<SkillStatusResponse> {
-    const response = await fetch(`/api/v1/skills/${skillId}/status`);
+    const response = await fetch(`/api/v1/knowledge-bases/${skillId}/status`);
     if (!response.ok) {
       throw new Error('Failed to fetch skill status');
     }

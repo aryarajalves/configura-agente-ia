@@ -8,7 +8,21 @@ from uuid import UUID
 from pydantic import BaseModel
 from typing import Optional, List
 
+from typing import Optional, List, Any
+
 router = APIRouter()
+
+def prepare_agent_data(agent: Any) -> dict:
+    """Flatten rules_config for the frontend."""
+    data = AgentSchema.model_validate(agent).model_dump()
+    if hasattr(agent, "rules_config") and isinstance(agent.rules_config, dict):
+        for k, v in agent.rules_config.items():
+            if k not in data or data[k] is None:
+                data[k] = v
+    # Map model_fast_id to model
+    if "model_fast_id" in data:
+        data["model"] = data["model_fast_id"]
+    return data
 
 class AgentCreateSchema(BaseModel):
     name: str
@@ -70,7 +84,7 @@ async def list_agents(
     admin: dict = Depends(get_superadmin)
 ):
     agents = await AgentService.list_agents(db, superadmin_id=admin["id"])
-    return SuccessResponse(data=[AgentSchema.model_validate(a) for a in agents])
+    return SuccessResponse(data=[prepare_agent_data(a) for a in agents])
 
 @router.post("", response_model=SuccessResponse)
 async def create_agent(
@@ -79,6 +93,13 @@ async def create_agent(
     admin: dict = Depends(get_superadmin)
 ):
     raw = payload.model_dump(exclude_none=True)
+    
+    if not payload.name or not payload.name.strip():
+        raise HTTPException(status_code=422, detail="Nome do agente é obrigatório")
+        
+    model = payload.model or payload.model_fast_id
+    if not payload.router_enabled and not model:
+        raise HTTPException(status_code=422, detail="Modelo é obrigatório quando roteamento está desativado")
 
     # Map 'model' (frontend field) → 'model_fast_id' (DB column)
     if "model" in raw and not raw.get("model_fast_id"):
@@ -90,17 +111,30 @@ async def create_agent(
     raw.setdefault("model_fast_id", "gpt-4o-mini")
     raw.setdefault("model_analytic_id", raw.get("model_fast_id", "gpt-4o"))
 
-    # Only pass fields that exist on the Agent model to avoid unexpected-keyword errors
+    # Define direct model fields
     AGENT_FIELDS = {
         "name", "superadmin_id", "status", "is_locked",
         "model_fast_id", "model_analytic_id", "model_fallback_id",
         "rules_config", "routing_thresholds",
     }
+
+    # Pack all other fields into rules_config
     agent_data = {k: v for k, v in raw.items() if k in AGENT_FIELDS}
+    
+    rules_config = raw.get("rules_config", {})
+    if not isinstance(rules_config, dict):
+        rules_config = {}
+    
+    # Add floating fields (prompt, temperature, etc) to rules_config
+    for key, value in raw.items():
+        if key not in AGENT_FIELDS:
+            rules_config[key] = value
+    
+    agent_data["rules_config"] = rules_config
     agent_data["superadmin_id"] = admin["id"]
 
     agent = await AgentService.create_agent(db, agent_data)
-    return SuccessResponse(data=AgentSchema.model_validate(agent), message="Agent created successfully")
+    return SuccessResponse(data=prepare_agent_data(agent), message="Agent created successfully")
 
 
 @router.get("/{id}", response_model=SuccessResponse)
@@ -108,16 +142,10 @@ async def get_agent(id: UUID, db: AsyncSession = Depends(get_db)):
     agent = await AgentService.get_agent(db, id)
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
-    return SuccessResponse(data=AgentSchema.model_validate(agent))
+    return SuccessResponse(data=prepare_agent_data(agent))
 
-class AgentUpdateSchema(BaseModel):
+class AgentUpdateSchema(AgentCreateSchema):
     name: Optional[str] = None
-    status: Optional[str] = None
-    is_locked: Optional[bool] = None
-    model_fast_id: Optional[str] = None
-    model_analytic_id: Optional[str] = None
-    model_fallback_id: Optional[str] = None
-    rules_config: Optional[dict] = None
 
 @router.put("/{id}", response_model=SuccessResponse)
 async def update_agent(
@@ -126,7 +154,38 @@ async def update_agent(
     db: AsyncSession = Depends(get_db),
     admin: dict = Depends(get_superadmin)
 ):
-    update_data = payload.model_dump(exclude_unset=True)
+    raw = payload.model_dump(exclude_unset=True)
+    
+    if "name" in raw and not raw["name"].strip():
+        raise HTTPException(status_code=422, detail="Nome do agente não pode ser vazio")
+        
+    model = raw.get("model") or raw.get("model_fast_id")
+    if not raw.get("router_enabled") and not model and "model" in raw:
+        raise HTTPException(status_code=422, detail="Modelo é obrigatório")
+
+    if "model" in raw and not raw.get("model_fast_id"):
+        raw["model_fast_id"] = raw.pop("model")
+    else:
+        raw.pop("model", None)
+
+    AGENT_FIELDS = {
+        "name", "superadmin_id", "status", "is_locked",
+        "model_fast_id", "model_analytic_id", "model_fallback_id",
+        "rules_config", "routing_thresholds",
+    }
+    
+    update_data = {k: v for k, v in raw.items() if k in AGENT_FIELDS}
+    
+    # Se houver campos que pertencem a rules_config, precisamos garantir que rules_config seja um dicionário
+    extra_fields = {k: v for k, v in raw.items() if k not in AGENT_FIELDS}
+    if extra_fields:
+        rules_config = raw.get("rules_config", {})
+        if not isinstance(rules_config, dict):
+            rules_config = {}
+        for key, value in extra_fields.items():
+            rules_config[key] = value
+        update_data["rules_config"] = rules_config
+
     
     agent = await AgentService.update_agent(
         db, 
@@ -139,4 +198,4 @@ async def update_agent(
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
         
-    return SuccessResponse(data=AgentSchema.model_validate(agent), message="Agent updated successfully")
+    return SuccessResponse(data=prepare_agent_data(agent), message="Agent updated successfully")

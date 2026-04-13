@@ -5,7 +5,7 @@ from src.models import (
     admin, agent, audit, cleanup_job, 
     container_health_metric, financial_record, 
     inbox, ingestion, process, process_log, 
-    skill, stress_test, system_settings
+    knowledge_base, stress_test, system_settings
 )
 
 async def init():
