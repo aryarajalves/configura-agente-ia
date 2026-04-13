@@ -14,6 +14,12 @@
 - Q: Estratégia para Rotas 404 (Not Found)? → A: Restaurar/Criar as rotas no Backend para compatibilidade com o Frontend.
 - Q: Organização dos Botões de Teste e Fine-Tuning? → A: Substituir o rótulo "Teste de Estresse" por "Fine-Tuning" no menu lateral, mantendo as funcionalidades de teste e apontando para `/fine-tuning`.
 
+### Session 2026-04-13
+
+- Q: Estrutura do Docker Compose Local? → A: Manter DB e Aplicação em arquivos separados, mas garantir comunicação via dependências externas e rede automática.
+- Q: Imagem do RabbitMQ? → A: Criar um Dockerfile customizado para RabbitMQ dentro da pasta `backend`.
+- Q: Integração de Arquivos Compose? → A: Usar a diretiva `include` para importar o banco de dados no arquivo local.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Correção da Terminologia e Navegação de Conhecimento (Priority: P1)
@@ -91,7 +97,7 @@ Como usuário logado, desejo permanecer autenticado durante minha sessão de tra
 - **FR-004**: O sistema DEVE validar e garantir que todos os campos obrigatórios na criação de agentes estejam presentes no payload antes do envio.
 - **FR-005**: O sistema DEVE renomear o item de menu "Teste de Estresse" para "Fine-Tuning" na sidebar, apontando para `/fine-tuning` e garantindo que as funcionalidades de teste de agentes estejam operacionais.
 - **FR-006**: O sistema DEVE remover redundâncias de UI (Inbox movido apenas para bases de conhecimento).
-- **FR-007**: O sistema DEVE garantir que a infraestrutura local (Docker) utilize imagens base consistentes para o RabbitMQ.
+- **FR-007**: O sistema DEVE configurar o `docker-compose-local.yml` para se comunicar com o banco de dados externo, garantindo que a rede `network_swarm_public` não dependa de criação manual externa para funcionar no deploy local.
 - **FR-008**: O sistema DEVE implementar persistência de login via Cookies sem expiração definida (sessão contínua).
 
 ### Key Entities *(include if feature involves data)*

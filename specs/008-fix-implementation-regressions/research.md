@@ -1,37 +1,16 @@
-# Research: Correção de Regressões e Estabilidade
+# Research: Infraestrutura e Deploy Local
 
-## Decisions
+## RabbitMQ Custom Dockerfile
+- **Pesquisa**: O requisito 13 da especificação pede uma imagem baseada no backend.
+- **Decisão**: Criar `backend/rabbitmq.Dockerfile` usando `rabbitmq:3-management` como base para permitir futuras personalizações (plugins, configs) mantendo o controle no repositório de backend.
+- **Rationale**: Segue a diretriz do usuário de centralizar a definição de imagem.
 
-### 1. Reversão de Nomenclatura (Skills -> Knowledge Bases)
-- **Decision**: Renomeação física de tabelas e colunas no banco de dados.
-- **Rationale**: O usuário solicitou explicitamente que "tudo o que tenha relação com o banco de dados" volte ao nome original para evitar confusão.
-- **Implementation**: Migration Alembic para renomear `skills` -> `knowledge_bases` e arquivos relacionados.
+## Docker Compose Include
+- **Pesquisa**: A diretiva `include` permite importar serviços, redes e volumes de outros arquivos compose.
+- **Decisão**: No `infra/docker-compose-local.yml`, usaremos `include: - docker-compose-db-local.yml`. 
+- **Rationale**: Isso importa o serviço `postgres` permitindo que o `backend` use `depends_on: postgres`.
 
-### 2. Restauração de Rotas de API
-- **Decision**: Criar novos endpoints no backend para suprir as 404s do frontend.
-- **Rationale**: O frontend legado ou em transição espera rotas específicas que foram removidas ou renomeadas no processo de refatoração para "Skills".
-- **Routes to add**:
-  - `GET /v1/knowledge-bases` (Alias para skills)
-  - `GET /v1/models`
-  - `GET /v1/fine-tuning/models`
-  - `GET /v1/integrations/google/status`
-  - `GET /v1/tools`
-  - `GET /v1/financial/report`
-  - `GET /v1/users`
-
-### 3. Persistência de Sessão
-- **Decision**: Uso de Cookies `HttpOnly` com expiração de longo prazo (ou sem expiração configurada no client-side).
-- **Rationale**: Atender ao requisito de "login sem limite" uma vez que o usuário esteja conectado.
-- **Implementation**: Ajustar `auth_service.py` para emitir cookies de longa duração e garantir que o middleware valide corretamente.
-
-### 4. Correção de Erros de Script (TypeError)
-- **Decision**: Implementar fallbacks de arrays vazios `[]` em todos os endpoints que retornam listas.
-- **Rationale**: Erros como `kbList.filter is not a function` ocorrem quando a API retorna `null` ou um erro em um campo esperado como lista.
-
-### 5. Infraestrutura RabbitMQ
-- **Decision**: Sincronizar a imagem do RabbitMQ no `docker-compose-local.yml` com a base do backend.
-- **Rationale**: Pedido específico do usuário para padronização de imagens (SC-13).
-
-## Alternatives Considered
-- **Frontend-only mapping**: Rejeitado pois o usuário quer consistência no banco de dados.
-- **Compatibility Layers (Aliasing only)**: Rejeitado em favor de restauração completa das rotas para manter a funcionalidade dos módulos (Financeiro, Usuários).
+## Rede network_swarm_public
+- **Pesquisa**: O Docker Compose cria redes automaticamente se não forem marcadas como `external`.
+- **Decisão**: Alterar a definição da rede para remover `external: true` no modo local, garantindo que o `docker-compose up` crie a rede se ela não existir.
+- **Rationale**: Atende ao pedido de "garantir que a rede seja criada automaticamente".

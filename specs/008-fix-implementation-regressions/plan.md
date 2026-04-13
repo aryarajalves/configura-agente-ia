@@ -1,80 +1,66 @@
-# Implementation Plan: Correção de Erros de Implementação e Regressões de UI
+# Implementation Plan - Corrigir Deploy do Backend e Infraestrutura
 
-**Branch**: `008-fix-implementation-regressions` | **Date**: 2026-04-10 | **Spec**: [spec.md](./spec.md)
-**Input**: Feature specification from `/specs/008-fix-implementation-regressions/spec.md`
-
-## Summary
-Este plano visa estabilizar a plataforma Aryaraj corrigindo regressões introduzidas em refatorações anteriores. O foco principal é a restauração da nomenclatura "Bases de Conhecimento" (revertendo "Skills") em todas as camadas (DB, Backend, Frontend), a restauração de rotas de API essenciais que estão retornando 404, a implementação de persistência de sessão via cookies e a correção de erros de UI que impedem a criação de agentes e visualização de módulos.
+**Feature Branch**: `008-fix-implementation-regressions`  
+**Status**: Planning  
+**User Request**: Corrigir o deploy no `infra/docker-compose-local.yml` onde o backend não está funcionando (travado esperando o banco). Aplicar as diretrizes de clarificação (include, Dockerfile customizado para RabbitMQ, rede automática).
 
 ## Technical Context
 
-**Language/Version**: Python 3.11+, TypeScript/React (Vite)  
-**Primary Dependencies**: FastAPI, SQLAlchemy, Alembic, React, TaskIQ, RabbitMQ  
-**Storage**: PostgreSQL + pgvector  
-**Testing**: pytest  
-**Target Platform**: Linux server (Docker On-premise)
-**Project Type**: web-service / web-app  
-**Performance Goals**: N/A (Estabilização de bugs existentes)  
-**Constraints**: Reversão física de banco de dados, persistência de autenticação sem expiração via Cookies.  
-**Scale/Scope**: Sistema de governança de agentes de IA.
+O deploy local atual falha porque o `backend` depende do `postgres`, mas o serviço de banco está em um arquivo separado (`docker-compose-db-local.yml`) e não há integração automática entre eles. Além disso, o RabbitMQ está usando uma imagem genérica enquanto o requisito pede uma imagem baseada no contexto do backend.
+
+### Constraints & Assumptions
+- **Include**: Usar a diretiva `include` do Docker Compose v2.20+ para importar o banco de dados.
+- **RabbitMQ**: Criar um `Dockerfile` para o RabbitMQ dentro de `backend/rabbitmq.Dockerfile`.
+- **Rede**: A rede `network_swarm_public` deve ser do tipo `bridge` e criada automaticamente se não existir no ambiente local.
+- **Dependência**: O `backend` deve ter um `depends_on` explícito para o `postgres` (importado via include).
+
+### Unknowns (NEEDS CLARIFICATION -> Phase 0)
+- [x] Configuração exata do `Dockerfile` do RabbitMQ.
+- [x] Sintaxe do `include` para arquivos em diretórios relativos.
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+| Principle | Status | Notes |
+| :--- | :--- | :--- |
+| I. Canonical Tech Stack | ✅ | Mantendo FastAPI, RabbitMQ e Postgres. |
+| IV. Performance & Resilience | ✅ | Healthchecks garantirão que o backend só suba com infra pronta. |
+| VIII. UX/UI Integrity | ✅ | Logs do Docker estarão limpos e estruturados. |
 
-- **Principle I (Tech Stack)**: Pass. O plano utiliza FastAPI, React e SQLAlchemy conforme exigido.
-- **Principle III (Data Integrity)**: Pass. Todas as mudanças de esquema serão via migrations Alembic. Reversão de "Skills" para "KnowledgeBase" segue o ID compartilhado RAG.
-- **Principle V (Security)**: Pass. Autenticação via JWT mantida, mas ajustada para persistência em Cookies conforme solicitado pelo usuário.
-- **Principle VIII (UX Integrity)**: Pass. Correção de indicadores de erro no frontend para evitar quebra de componentes.
+## Phase 0: Outline & Research
 
-## Project Structure
+1. **Research Task 1**: Validar se o `include` do Docker Compose suporta arquivos que usam redes externas ou se é melhor converter para redes internas gerenciadas.
+2. **Research Task 2**: Definir o conteúdo do `backend/rabbitmq.Dockerfile` para suportar os requisitos (provavelmente rabbitmq:3-management + algum config).
 
-### Documentation (this feature)
+## Phase 1: Design & Contracts
 
-```text
-specs/008-fix-implementation-regressions/
-├── plan.md              # This file
-├── research.md          # Resultados da análise de rotas e DB
-├── data-model.md        # Esquema de reversão para KnowledgeBase
-├── quickstart.md        # Guia de validação das correções
-├── contracts/           
-│   └── restored_apis.md # Contratos das rotas /v1/models, /v1/users, etc.
-└── tasks.md             # (Gerado em seguida via /speckit.tasks)
-```
+### Data Model
+Nenhuma alteração no modelo de dados relacionais.
 
-### Source Code (repository root)
+### Interface Contracts
+Ajuste nas portas e nomes de host:
+- `postgres` (serviço importado) acessível na rede interna como `postgres`.
+- `rabbitmq` (serviço local) acessível como `rabbitmq`.
 
-```text
-backend/src/
-├── models/
-│   ├── knowledge_base.py (Renomeado de skill.py)
-│   └── ...
-├── services/
-│   ├── knowledge_base_service.py (Renomeado de skill_service.py)
-│   └── auth_service.py (Ajustado para Cookies persistentes)
-├── api/v1/
-│   ├── agents.py (Fix validation)
-│   ├── knowledge_bases.py (Restauração de rota)
-│   ├── models.py (Nova rota restaurada)
-│   ├── tools.py (Nova rota restaurada)
-│   └── ...
-└── migrations/ (Novas migrations de renomeação)
+## Phase 2: Implementation Steps
 
-frontend/src/
-├── components/
-│   ├── Sidebar.jsx (Correção de nomes e links)
-│   └── ConfigPanel.jsx (Fix TypeError em kbList.filter)
-├── pages/
-│   ├── Financeiro.jsx (Fix forEach of undefined)
-│   └── UserManagement.jsx (Fix users.filter error)
-└── services/ (Ajuste de persistência de token)
-```
+### Step 1: RabbitMQ Custom Dockerfile
+- Criar `backend/rabbitmq.Dockerfile`.
+- Ajustar `docker-compose-local.yml` para usar o build desse Dockerfile.
 
-**Structure Decision**: Segue a estrutura de monorepo existente com separação de frontend e backend em `backend/src` e `frontend/src`.
+### Step 2: Ajuste do Docker Compose Local
+- Adicionar `include: - docker-compose-db-local.yml`.
+- Ajustar `networks` para não ser `external: true` se quisermos que seja criada automaticamente, OU manter `external: true` e usar `name` se for pré-requisito, mas a clarificação pediu "garantir que a rede seja criada automaticamente". Portanto, removeremos `external: true` e usaremos rede gerenciada.
 
-## Complexity Tracking
+### Step 3: Conexão Frontend -> Backend
+- Ajustar `VITE_API_URL` no `frontend` service para apontar para o host correto.
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| Renomeação Física de DB | Integridade técnica solicitada | Mapeamento apenas em código geraria dívida técnica entre DB e Model. |
-| Restauração de Endpoints | Compatibilidade com Frontend Legado | Refatorar todo o frontend para novas rotas seria mais arriscado e demorado. |
+## Verification Plan
+
+### Automated Tests
+- N/A para infra (exceto se houver scripts de validação).
+
+### Manual Verification
+1. `docker compose -f infra/docker-compose-local.yml up -d`
+2. Verificar se o container `postgres` subiu automaticamente.
+3. Verificar se o `backend` saiu do loop de espera por banco.
+4. Testar acesso à API em `localhost:8000`.

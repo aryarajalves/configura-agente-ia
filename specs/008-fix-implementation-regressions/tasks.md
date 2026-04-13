@@ -1,101 +1,74 @@
-# Tasks: Correção de Regressões e Estabilidade
+# Tasks: Correção de INFRA e Regressões (FluxAI)
 
 **Input**: Design documents from `/specs/008-fix-implementation-regressions/`
-**Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/
+**Prerequisites**: plan.md, spec.md, research.md, quickstart.md
 
-## Phase 1: Setup (Shared Infrastructure)
+## Phase 1: Setup (Infraestrutura e Deploy)
 
-**Purpose**: Infraestrutura básica e ajustes de ambiente.
+**Purpose**: Orquestração Docker e infraestrutura básica local.
 
-- [x] T001 Atualizar imagem do RabbitMQ no `infra/docker-compose-local.yml` para herdar do backend `${IMAGE_BASE}-backend`.
-
----
-
-## Phase 2: Foundational (Blocking Prerequisites)
-
-**Purpose**: Reversão estrutural de nomenclatura no backend (Skills -> KnowledgeBase).
-
-- [x] T002 Renomear `backend/src/models/skill.py` para `backend/src/models/knowledge_base.py` e atualizar classe/tabela.
-- [x] T003 [P] Renomear `backend/src/services/skill_service.py` para `backend/src/services/knowledge_base_service.py` e atualizar referências.
-- [x] T004 [P] Renomear `backend/src/services/skill_version_service.py` para `backend/src/services/knowledge_base_version_service.py`.
-- [x] T005 [P] Criar Migration Alembic para renomear tabelas `skills` -> `knowledge_bases`, `skill_versions` -> `knowledge_base_versions` e IDs relacionados.
-- [x] T006 Atualizar imports em todo o diretório `backend/src/` para refletir os novos nomes de modelos e serviços.
-
-**Checkpoint**: Estrutura de dados revertida para "KnowledgeBase". Pronto para as User Stories.
+- [ ] T001 [P] Criar Dockerfile customizado para RabbitMQ em `backend/rabbitmq.Dockerfile`
+- [ ] T002 [P] Atualizar `infra/docker-compose-local.yml` para incluir `include: - docker-compose-db-local.yml`
+- [ ] T003 Atualizar serviço `rabbitmq` em `infra/docker-compose-local.yml` para usar `build` do context `../backend`
+- [ ] T004 [P] Ajustar rede `network_swarm_public` em `infra/docker-compose-local.yml` e `infra/docker-compose-db-local.yml` para bridge interna (remover `external: true`)
+- [ ] T005 [P] Adicionar dependência `depends_on: postgres` (condition: healthy) no backend em `infra/docker-compose-local.yml`
+- [ ] T006 [P] Descomentar e ajustar `VITE_API_URL` para `http://localhost:8000` no frontend service em `infra/docker-compose-local.yml`
 
 ---
 
-## Phase 3: User Story 1 - Terminologia e Navegação (Priority: P1) 🎯 MVP
+## Phase 2: Foundational (Capa de Dados Knowledge Base)
 
-**Goal**: Restaurar nomes consistentes na interface e garantindo navegação funcional.
+**Purpose**: Estabilização da nomenclatura técnica e estrutura de dados.
 
-**Independent Test**: Conferir se a sidebar exibe "Bases de Conhecimento" e redireciona para `/knowledge-bases` funcional.
-
-### Implementation for User Story 1
-
-- [x] T007 [P] [US1] Atualizar `frontend/src/components/Sidebar.jsx` para renomear "Skills (Bases)" para "Bases de Conhecimento" e ajustar link para `/knowledge-bases`.
-- [x] T008 [P] [US1] Renomear roteador `backend/src/api/v1/skills.py` para `backend/src/api/v1/knowledge_bases.py` e ajustar prefixo.
-- [x] T009 [US1] Restaurar endpoint `GET /v1/knowledge-bases` com suporte a listagem em `backend/src/api/v1/knowledge_bases.py`.
-- [x] T010 [US1] Substituir rótulo "Teste de Estresse" por "Fine-Tuning" em `frontend/src/components/Sidebar.jsx` e apontar para `/fine-tuning`.
-- [x] T011 [P] [US1] Remover item "Inbox (Falhas)" da sidebar em `frontend/src/components/Sidebar.jsx`.
+- [ ] T007 Executar script de migração para garantir que tabelas `knowledge_bases` e `knowledge_base_versions` existam fisicamente
+- [ ] T008 [P] Validar se todos os controllers em `backend/src/api/v1/` importam `KnowledgeBaseService` em vez de `SkillService`
+- [ ] T009 [P] Validar integridade das models em `backend/src/models/knowledge_base.py`
 
 ---
 
-## Phase 4: User Story 2 - Estabilidade na Criação de Agentes (Priority: P1) 🎯 MVP
+## Phase 3: User Story 1 - Terminologia e Sidebar (Priority: P1)
 
-**Goal**: Corrigir erros de validação e runtime na criação e configuração de agentes.
+**Goal**: Interface consistente com "Bases de Conhecimento" e links corrigidos.
 
-**Independent Test**: Criar um novo agente e acessar a aba "Habilidades" sem erros no console.
-
-### Implementation for User Story 2
-
-- [x] T012 [US2] Corrigir validação de campos obrigatórios em `backend/src/api/v1/agents.py` para evitar erro 422 silencioso.
-- [x] T013 [P] [US2] Criar `backend/src/api/v1/models.py` para restaurar endpoint `GET /v1/models`.
-- [x] T014 [P] [US2] Criar `backend/src/api/v1/tools.py` para restaurar endpoint `GET /v1/tools`.
-- [x] T015 [US2] Implementar fallbacks `[]` em `frontend/src/components/ConfigPanel.jsx` para evitar `TypeError: filter is not a function`.
+- [ ] T010 [P] [US1] Atualizar `frontend/src/components/Sidebar.jsx` para renomear "Skills (Bases)" para "Bases de Conhecimento" e ajustar link para `/knowledge-bases`
+- [ ] T011 [P] [US1] Mover "Inbox (Falhas)" da sidebar global para dentro da página de Bases de Conhecimento
+- [ ] T012 [P] [US1] Renomear rótulo "Teste de Estresse" por "Fine-Tuning" em `frontend/src/components/Sidebar.jsx` apontando para `/fine-tuning`
 
 ---
 
-## Phase 5: User Story 3 - Integridade dos Módulos (Financeiro/Usuários) (Priority: P2)
+## Phase 4: User Story 2 - Estabilidade na Criação de Agentes (Priority: P1)
 
-**Goal**: Restaurar acesso aos módulos de gestão com dados consistentes.
+**Goal**: Eliminar erros 422/404 na configuração de novos agentes.
 
-**Independent Test**: Acessar `/financeiro` e `/users` e ver listas renderizadas em vez de erros.
+- [ ] T013 [US2] Implementar validação de campos obrigatórios em `backend/src/api/v1/agents.py` para evitar falhas silenciosas
+- [ ] T014 [P] [US2] Restaurar endpoints `GET /v1/models` em `backend/src/api/v1/models.py`
+- [ ] T015 [P] [US2] Restaurar endpoints `GET /v1/tools` em `backend/src/api/v1/tools.py`
+- [ ] T016 [US2] Adicionar fallbacks `[]` em `frontend/src/components/ConfigPanel.jsx` para tratar listas vazias de ferramentas/habilidades
 
-### Implementation for User Story 3
+---
 
-- [x] T016 [US3] Criar `backend/src/api/v1/users.py` para restaurar endpoint `GET /v1/users` (listagem de administradores).
-- [x] T017 [P] [US3] Adicionar rota `GET /v1/financial/report` em `backend/src/api/v1/finance.py` como alias para summary.
-- [x] T018 [US3] Adicionar verificações de nulidade e fallbacks `[]` em `frontend/src/pages/Financeiro.jsx`.
-- [x] T019 [P] [US3] Adicionar verificações de nulidade e fallbacks `[]` em `frontend/src/pages/UserManagement.jsx`.
+## Phase 5: User Story 3 - Módulos Financeiro e Usuários (Priority: P2)
+
+**Goal**: Garantir que as listas de usuários e relatórios financeiros carreguem sem erros de runtime.
+
+- [ ] T017 [US3] Implementar endpoint `GET /v1/users` em `backend/src/api/v1/users.py` para listagem de admins
+- [ ] T018 [P] [US3] Garantir que `backend/src/api/v1/finance.py` responda em `/v1/financial/report`
+- [ ] T019 [US3] Corrigir erro de renderização `forEach of undefined` em `frontend/src/pages/Financeiro.jsx` via verificações de nulidade
+- [ ] T020 [P] [US3] Corrigir erro `users.filter is not a function` em `frontend/src/pages/UserManagement.jsx` via fallbacks de array
 
 ---
 
 ## Phase 6: User Story 4 - Persistência de Sessão (Priority: P2)
 
-**Goal**: Garantir login contínuo via Cookies persistentes.
+**Goal**: Manter o usuário logado via cookies persistentes.
 
-**Independent Test**: Permanecer logado após refresh ou tempo de inatividade prolongado.
-
-### Implementation for User Story 4
-
-- [x] T020 [US4] Atualizar `backend/src/services/auth_service.py` para suportar emissão de tokens/cookies persistentes (long-lived).
-- [x] T021 [US4] Ajustar lógica de login em `backend/src/api/v1/auth.py` para setar cookies com `HttpOnly=True` e sem expiração curta.
+- [ ] T021 [US4] Configurar `HttpOnly` cookies e tempo de expiração estendido em `backend/src/services/auth_service.py`
+- [ ] T022 [US4] Ajustar endpoint de login em `backend/src/api/v1/auth.py` para emitir os cookies de sessão contínua
 
 ---
 
-## Phase 7: Polish & Cross-Cutting Concerns
+## Phase 7: Polish & Validação Geral
 
-- [x] T022 [P] Atualizar `README.md` com a nova (velha) nomenclatura de Knowledge Base.
-- [x] T023 Validar todos os fluxos usando o guia em `quickstart.md`.
-- [x] T024 Remover arquivos residuais e scripts de debug não utilizados no backend.
-
----
-
-## Dependencies & Execution Order
-
-1. **Phase 1 & 2** devem ser concluídas primeiro (Base para tudo).
-2. **US1 e US2** podem ser executadas em paralelo após a Phase 2 (Ambas P1).
-3. **US3 e US4** podem ser executadas em paralelo por último.
- de API)
-- T017, T019 (Ajustes de módulos de gestão)
+- [ ] T023 Executar smoke test completo seguindo o `quickstart.md`
+- [ ] T024 Validar critério SC-002: Zero erros detectados no console durante a navegação entre todos os módulos
+- [ ] T025 [P] Atualizar documentação local para refletir a nova orquestração Docker

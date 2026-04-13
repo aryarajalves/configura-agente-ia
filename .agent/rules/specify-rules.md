@@ -1,6 +1,6 @@
 # configura-agente-ia-aryaraj Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-04-10
+Auto-generated from all feature plans. Last updated: 2026-04-13
 
 ## Active Technologies
 - Python 3.12+ (Backend), TypeScript 5+ (Frontend) + FastAPI, SQLAlchemy (Async), LangGraph, TaskIQ, RabbitMQ, Pydantic v2 (003-performance-tools)
@@ -30,7 +30,6 @@ Python 3.12+ (Async): Follow standard conventions
 ## Recent Changes
 - 008-fix-implementation-regressions: Added Python 3.11+, TypeScript/React (Vite) + FastAPI, SQLAlchemy, Alembic, React, TaskIQ, RabbitMQ
 - 006-background-process-monitor: Added Python 3.11+ (Backend), TypeScript (Frontend) + TaskIQ, RabbitMQ, LangGraph, FastAPI UI WebSockets, React, shadcn/ui
-- 005-cloud-ingestion-worker: Added [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
 
 
 <!-- MANUAL ADDITIONS START -->
