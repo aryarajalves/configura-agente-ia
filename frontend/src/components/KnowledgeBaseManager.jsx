@@ -5,6 +5,15 @@ import ExpandableField from './ExpandableField';
 import KnowledgeBaseImporter from './KnowledgeBaseImporter';
 import ConfirmModal from './ConfirmModal';
 
+/**
+ * KnowledgeBaseManager Component
+ * 
+ * UI Refactor (2026-04-27):
+ * - Simplified Quick Actions bar to 4 primary buttons.
+ * - Secondary import options (Paste, CSV, PDF) moved to AddDocumentsModal.
+ * - Manual Q&A entry form moved to AddNewEntryModal for better list visibility.
+ * - Uses React portals for consistent z-index and accessibility.
+ */
 const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, onUpdate, collapsible = true, kbType = 'qa', kbId }) => {
     const [isExpanded, setIsExpanded] = useState(!collapsible);
     const [currentPage, setCurrentPage] = useState(1);
@@ -67,7 +76,7 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
     const [isGlobalConfigEnabled, setIsGlobalConfigEnabled] = useState(false);
     const [isProcessingJsonBatch, setIsProcessingJsonBatch] = useState(false);
     const [isUploadMode, setIsUploadMode] = useState(false); // false = texto, true = arquivo
-    
+
     // Lista de metadados
     const [metadata, setMetadata] = useState([{ name: '', content: '' }]);
     const [isJsonModalOpen, setIsJsonModalOpen] = useState(false);
@@ -78,19 +87,28 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
     const [transcriptionFilename, setTranscriptionFilename] = useState('');
     const [isTextOptionsOpen, setIsTextOptionsOpen] = useState(false);
     const [textForProcessing, setTextForProcessing] = useState('');
+    const [isAddDocsModalOpen, setIsAddDocsModalOpen] = useState(false);
+    const [isAddNewModalOpen, setIsAddNewModalOpen] = useState(false);
 
     const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
-    const [bulkEditForm, setBulkEditForm] = useState({ 
-        question: '', 
-        answer: '', 
-        metadata_val: '', 
-        category: '', 
-        useQuestion: false, 
-        useAnswer: false, 
-        useMetadata: false, 
-        useCategory: false 
+    const [bulkEditForm, setBulkEditForm] = useState({
+        question: '',
+        answer: '',
+        metadata_val: '',
+        category: '',
+        useQuestion: false,
+        useAnswer: false,
+        useMetadata: false,
+        useCategory: false
     });
+
+    // Estados para Edição e Navegação no Modal Maximizado
+    const [isEditingMaximized, setIsEditingMaximized] = useState(false);
+    const [maximizedForm, setMaximizedForm] = useState(null);
+    const [isSavingMaximized, setIsSavingMaximized] = useState(false);
     const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+    const [showJsonView, setShowJsonView] = useState(false);
+    const [metadataEditorItems, setMetadataEditorItems] = useState([]);
 
     const [isBulkSummarizeOpen, setIsBulkSummarizeOpen] = useState(false);
     const [bulkSummarizeForm, setBulkSummarizeForm] = useState({
@@ -157,6 +175,84 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
         }
     };
 
+    // Data processing and Filtering
+    const safeKb = Array.isArray(knowledgeBase) ? knowledgeBase : [];
+    const filteredItems = safeKb
+        .map((item, index) => (item ? { ...item, originalIndex: index } : null))
+        .filter(item => !!item)
+        .filter(item => {
+            if (!kbFilterTerm.trim()) return true;
+            const t = kbFilterTerm.toLowerCase();
+            return (
+                (item?.question || '').toLowerCase().includes(t) ||
+                (item?.answer || '').toLowerCase().includes(t) ||
+                (item?.category || '').toLowerCase().includes(t) ||
+                (item?.metadata_val || '').toLowerCase().includes(t)
+            );
+        });
+
+    const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
+    const paginatedItems = filteredItems.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+    const hasItems = filteredItems.length > 0;
+
+    // Navigation and Update Handlers for Maximized Modal
+    const handlePrevItem = () => {
+        if (!maximizedItem) return;
+        const currentIndex = filteredItems.findIndex(i => i.id === maximizedItem.id);
+        if (currentIndex > 0) {
+            const prevItem = filteredItems[currentIndex - 1];
+            setMaximizedItem({ ...prevItem });
+            setIsEditingMaximized(false);
+            setMaximizedForm(null);
+        }
+    };
+
+    const handleNextItem = () => {
+        if (!maximizedItem) return;
+        const currentIndex = filteredItems.findIndex(i => i.id === maximizedItem.id);
+        if (currentIndex < filteredItems.length - 1) {
+            const nextItem = filteredItems[currentIndex + 1];
+            setMaximizedItem({ ...nextItem });
+            setIsEditingMaximized(false);
+            setMaximizedForm(null);
+        }
+    };
+
+    const handleUpdateMaximized = async () => {
+        if (!maximizedForm || !maximizedItem) return;
+        setIsSavingMaximized(true);
+        try {
+            // Normalização dos metadados: converte o array do editor em um objeto JSON
+            const metadataObj = {};
+            metadataEditorItems.forEach(item => {
+                if (item.key.trim()) {
+                    metadataObj[item.key.trim()] = item.value;
+                }
+            });
+
+            const finalPayload = {
+                ...maximizedForm,
+                metadata_val: JSON.stringify(metadataObj)
+            };
+
+            const response = await api.put(`/knowledge-items/${maximizedItem.id}`, finalPayload);
+            if (response) {
+                if (onUpdate) {
+                    await onUpdate(maximizedItem.id, finalPayload);
+                }
+                setMaximizedItem({ ...finalPayload, id: maximizedItem.id });
+                setIsEditingMaximized(false);
+                setMaximizedForm(null);
+                setShowSuccessModal(true);
+            }
+        } catch (error) {
+            console.error('Erro ao atualizar item:', error);
+            alert('Falha ao atualizar o item. Por favor, tente novamente.');
+        } finally {
+            setIsSavingMaximized(false);
+        }
+    };
+
     useEffect(() => {
         const fetchKbData = async () => {
             if (!kbId) return;
@@ -178,13 +274,32 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
     }, [kbId]);
 
     useEffect(() => {
-        if (sourceView || duplicateGroups || showMaximizedTranscription || isTranscribing || isCreatingRag || showTranscriptionPopup || showRagConfigPopup || showSuccessModal || isBulkEditOpen || isBulkSummarizeOpen || isTextOptionsOpen) {
+        if (maximizedItem || sourceView || duplicateGroups || showMaximizedTranscription || isTranscribing || isCreatingRag || showTranscriptionPopup || showRagConfigPopup || showSuccessModal || isBulkEditOpen || isBulkSummarizeOpen || isTextOptionsOpen) {
             document.body.style.overflow = 'hidden';
         } else {
             document.body.style.overflow = '';
         }
         return () => { document.body.style.overflow = ''; };
-    }, [sourceView, duplicateGroups, showMaximizedTranscription, isTranscribing, isCreatingRag, showTranscriptionPopup, showRagConfigPopup, showSuccessModal, isBulkEditOpen, isBulkSummarizeOpen, isTextOptionsOpen]);
+    }, [maximizedItem, sourceView, duplicateGroups, showMaximizedTranscription, isTranscribing, isCreatingRag, showTranscriptionPopup, showRagConfigPopup, showSuccessModal, isBulkEditOpen, isBulkSummarizeOpen, isTextOptionsOpen]);
+
+    // Listener para navegação via teclado no modal maximizado
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (!maximizedItem || isEditingMaximized) return;
+
+            if (e.key === 'ArrowLeft') {
+                handlePrevItem();
+            } else if (e.key === 'ArrowRight') {
+                handleNextItem();
+            } else if (e.key === 'Escape') {
+                setMaximizedItem(null);
+                setIsEditingMaximized(false);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [maximizedItem, isEditingMaximized, filteredItems]);
 
     const toggleSelect = (id) => {
         const newSelected = new Set(selectedItems);
@@ -357,11 +472,11 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
     const handleBulkUpdate = async () => {
         if (!selectedItems.size || !kbId) return;
         setIsBulkUpdating(true);
-        
+
         const updatePayload = {
             item_ids: Array.from(selectedItems)
         };
-        
+
         if (bulkEditForm.useQuestion) updatePayload.question = bulkEditForm.question;
         if (bulkEditForm.useAnswer) updatePayload.answer = bulkEditForm.answer;
         if (bulkEditForm.useMetadata) updatePayload.metadata_val = bulkEditForm.metadata_val;
@@ -587,7 +702,7 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
             currentMap.forEach((val, key) => {
                 updatedMetadata.push({ name: key, content: val });
             });
-            
+
             if (updatedMetadata.length === 0) {
                 updatedMetadata.push({ name: '', content: '' });
             }
@@ -614,24 +729,6 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
         setShowImporter(true);
     };
 
-    const safeKb = Array.isArray(knowledgeBase) ? knowledgeBase : [];
-    const filteredItems = safeKb
-        .map((item, index) => (item ? { ...item, originalIndex: index } : null))
-        .filter(item => !!item)
-        .filter(item => {
-            if (!kbFilterTerm.trim()) return true;
-            const t = kbFilterTerm.toLowerCase();
-            return (
-                (item?.question || '').toLowerCase().includes(t) ||
-                (item?.answer || '').toLowerCase().includes(t) ||
-                (item?.category || '').toLowerCase().includes(t) ||
-                (item?.metadata_val || '').toLowerCase().includes(t)
-            );
-        });
-
-    const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
-    const paginatedItems = filteredItems.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-    const hasItems = filteredItems.length > 0;
 
     const handleCreateRag = async () => {
         if (!selectedVideoFile) return;
@@ -655,7 +752,7 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
             formData.append('is_media', selectedMediaType === 'media' ? 'true' : 'false');
 
             const response = await api.post(`/knowledge-bases/${kbId}/video-background`, formData);
-            
+
             if (response.ok) {
                 setShowRagConfigPopup(false);
                 setShowSuccessModal(true);
@@ -719,11 +816,11 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                 initialText={pendingText}
                 kbType={kbType}
                 kbId={kbId}
-                onCancel={(payload) => { 
-                    setShowImporter(false); 
-                    setPendingFile(null); 
-                    setPendingUrl(''); 
-                    setPendingText(''); 
+                onCancel={(payload) => {
+                    setShowImporter(false);
+                    setPendingFile(null);
+                    setPendingUrl('');
+                    setPendingText('');
                     if (payload && payload.backToText) {
                         setTempText(payload.text);
                         setIsTextModalOpen(true);
@@ -766,100 +863,42 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
 
             <div className="kb-content" style={{ animation: 'fadeIn 0.4s ease-out' }}>
                 <div className="kb-quick-actions">
-                    <button onClick={handleImportClick} className="kb-quick-action-btn">📥 Importar CSV / Excel</button>
-                    {kbType !== 'product' && (
-                        <>
-                            <button onClick={handlePasteText} className="kb-quick-action-btn">📋 Colar Texto</button>
-                            <button onClick={() => setShowMediaSelectionModal(true)} className="kb-quick-action-btn">
-                                📽️ Transcrição de Vídeo
-                            </button>
-                            <button onClick={() => {
-                                setJsonBatchInput('');
-                                setIsJsonBatchModalOpen(true);
-                            }} className="kb-quick-action-btn">
-                                📄 Upload Json
-                            </button>
-                            <button onClick={() => fileInputRef.current.click()} className="kb-quick-action-btn" disabled={uploading}>
-                                {uploading ? '🔄 Processando...' : '📄 Upload PDF/DOCX'}
-                            </button>
-                            <input
-                                type="file"
-                                ref={videoInputRef}
-                                style={{ display: 'none' }}
-                                onChange={handleVideoTranscribe}
-                                accept="video/*,audio/*"
-                            />
-                            <input
-                                type="file"
-                                ref={textMediaInputRef}
-                                style={{ display: 'none' }}
-                                onChange={handleTextMediaTranscribe}
-                                accept=".txt"
-                            />
-                        </>
-                    )}
+                    <button onClick={() => setIsAddNewModalOpen(true)} className="kb-quick-action-btn">✨ Adicionar Novo</button>
+                    <button onClick={() => setIsAddDocsModalOpen(true)} className="kb-quick-action-btn">📂 Adicionar Documentos</button>
+                    <button onClick={() => setShowMediaSelectionModal(true)} className="kb-quick-action-btn">
+                        📽️ Transcrição de Vídeo
+                    </button>
+                    <button onClick={() => {
+                        setJsonBatchInput('');
+                        setIsJsonBatchModalOpen(true);
+                    }} className="kb-quick-action-btn">
+                        📄 Upload Json
+                    </button>
+                    <input
+                        type="file"
+                        ref={videoInputRef}
+                        style={{ display: 'none' }}
+                        onChange={handleVideoTranscribe}
+                        accept="video/*,audio/*"
+                    />
+                    <input
+                        type="file"
+                        ref={textMediaInputRef}
+                        style={{ display: 'none' }}
+                        onChange={handleTextMediaTranscribe}
+                        accept=".txt"
+                    />
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        style={{ display: 'none' }}
+                        onChange={handleFileUpload}
+                        accept=".pdf,.docx,.doc"
+                    />
                 </div>
 
 
-                {kbType !== 'product' && (
-                    <div className="kb-add-card" style={{ marginBottom: '3rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-                            <div style={{ width: '8px', height: '24px', background: 'var(--accent-gradient)', borderRadius: '4px' }}></div>
-                            <h4 style={{ color: 'white', fontSize: '1.1rem', fontWeight: 800 }}>Novo Conhecimento</h4>
-                        </div>
-
-                        <div className="form-row-kb">
-                            <div className="form-group flex-2">
-                                <ExpandableField
-                                    label={kbLabels.question}
-                                    placeholder={`Ex: ${kbLabels.question === 'Pergunta' ? 'Qual o horário de funcionamento?' : 'Digite aqui...'}`}
-                                    value={newPair.question}
-                                    onChange={(e) => setNewPair({ ...newPair, question: e.target.value })}
-                                />
-                            </div>
-                            <div className="form-group flex-2">
-                                <ExpandableField
-                                    label={kbLabels.metadata}
-                                    placeholder={`Ex: ${kbLabels.metadata === 'Metadado' ? 'PAINEL INICIAL | Chat' : 'Digite aqui...'}`}
-                                    value={newPair.metadata_val}
-                                    onChange={(e) => setNewPair({ ...newPair, metadata_val: e.target.value })}
-                                />
-                            </div>
-                            <div className="form-group flex-1">
-                                <label>Categoria</label>
-                                <input
-                                    type="text"
-                                    value={newPair.category}
-                                    onChange={e => setNewPair({ ...newPair, category: e.target.value })}
-                                    placeholder="Geral, Preços, etc."
-                                />
-                            </div>
-                        </div>
-                        <div className="form-group">
-                            <ExpandableField
-                                label={kbLabels.answer}
-                                type="textarea"
-                                placeholder={`Ex: ${kbLabels.answer === 'Resposta' ? 'O horário é...' : 'Digite o conteúdo...'}`}
-                                value={newPair.answer}
-                                onChange={(e) => setNewPair({ ...newPair, answer: e.target.value })}
-                                style={{ minHeight: '120px' }}
-                            />
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '12px', marginTop: '-10px', marginBottom: '1.5rem', padding: '6px 12px', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '10px', width: 'fit-content', border: '1px solid rgba(99, 102, 241, 0.1)' }}>
-                            <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 800 }}>
-                                📏 {(newPair.question?.length || 0) + (newPair.answer?.length || 0) + (newPair.metadata_val?.length || 0)} CHARS
-                            </span>
-                            <span style={{ fontSize: '0.7rem', color: '#818cf8', fontWeight: 800 }}>
-                                🪙 ~{Math.ceil(((newPair.question?.length || 0) + (newPair.answer?.length || 0) + (newPair.metadata_val?.length || 0)) / 4)} TOKENS
-                            </span>
-                        </div>
-
-                        <button onClick={handleAddItem} className="create-agent-btn" style={{ width: '100%', border: 'none' }}>
-                            ✓ Adicionar à Base
-                        </button>
-                    </div>
-                )}
+                {/* Form moved to modal */}
 
                 {/* SIMULATOR BLOCK */}
                 <div style={{ marginTop: '3rem', paddingTop: '0' }}>
@@ -909,7 +948,7 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                             <div style={{ marginTop: '2rem', background: 'rgba(0,0,0,0.3)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid rgba(255,255,255,0.05)', position: 'relative' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                                     <h5 style={{ color: '#818cf8', fontWeight: 700, margin: 0, fontSize: '0.9rem' }}>RESULTADOS DA BUSCA:</h5>
-                                    <button 
+                                    <button
                                         onClick={() => setSimResults(null)}
                                         style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', borderRadius: '8px', width: '28px', height: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
                                         onMouseEnter={e => e.currentTarget.style.background = 'rgba(244, 63, 94, 0.2)'}
@@ -1200,7 +1239,7 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                                                             `}</style>
 
                                                         <div style={{ display: 'flex', gap: '12px', marginTop: '1.5rem', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-                                                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-start' }}>
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-start' }}>
                                                                 <span className="kb-category-pill">{displayItem.category || 'Geral'}</span>
                                                                 <div className="kb-stats-pill">
                                                                     📏 {(displayItem.question?.length || 0) + (displayItem.answer?.length || 0) + (displayItem.metadata?.length || 0)} chars | 🪙 ~{Math.ceil(((displayItem.question?.length || 0) + (displayItem.answer?.length || 0) + (displayItem.metadata?.length || 0)) / 4)} tokens
@@ -1321,13 +1360,57 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
 
             {maximizedItem && document.body && createPortal(
                 <div
-                    onClick={() => setMaximizedItem(null)}
+                    onClick={() => { if (!isEditingMaximized) setMaximizedItem(null); }}
                     style={{
                         position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)',
                         zIndex: 20000, display: 'flex', alignItems: 'center', justifyContent: 'center',
                         padding: '2rem', animation: 'fadeIn 0.2s ease'
                     }}
                 >
+                    {/* Navigation Arrows */}
+                    {!isEditingMaximized && (
+                        <>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); handlePrevItem(); }}
+                                disabled={filteredItems.findIndex(i => i.id === maximizedItem.id) === 0}
+                                style={{
+                                    position: 'absolute', left: '2rem', top: '50%', transform: 'translateY(-50%)',
+                                    background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+                                    color: 'white', width: '64px', height: '64px', borderRadius: '50%',
+                                    cursor: filteredItems.findIndex(i => i.id === maximizedItem.id) === 0 ? 'not-allowed' : 'pointer',
+                                    fontSize: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    zIndex: 20001, transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    opacity: filteredItems.findIndex(i => i.id === maximizedItem.id) === 0 ? 0.1 : 0.8,
+                                    boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                                    backdropFilter: 'blur(4px)'
+                                }}
+                                onMouseEnter={e => { if (filteredItems.findIndex(i => i.id === maximizedItem.id) !== 0) { e.currentTarget.style.background = 'rgba(99,102,241,0.4)'; e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)'; e.currentTarget.style.opacity = '1'; } }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.transform = 'translateY(-50%) scale(1)'; e.currentTarget.style.opacity = '0.8'; }}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                            </button>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); handleNextItem(); }}
+                                disabled={filteredItems.findIndex(i => i.id === maximizedItem.id) === filteredItems.length - 1}
+                                style={{
+                                    position: 'absolute', right: '2rem', top: '50%', transform: 'translateY(-50%)',
+                                    background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+                                    color: 'white', width: '64px', height: '64px', borderRadius: '50%',
+                                    cursor: filteredItems.findIndex(i => i.id === maximizedItem.id) === filteredItems.length - 1 ? 'not-allowed' : 'pointer',
+                                    fontSize: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    zIndex: 20001, transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    opacity: filteredItems.findIndex(i => i.id === maximizedItem.id) === filteredItems.length - 1 ? 0.1 : 0.8,
+                                    boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                                    backdropFilter: 'blur(4px)'
+                                }}
+                                onMouseEnter={e => { if (filteredItems.findIndex(i => i.id === maximizedItem.id) !== filteredItems.length - 1) { e.currentTarget.style.background = 'rgba(99,102,241,0.4)'; e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)'; e.currentTarget.style.opacity = '1'; } }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.transform = 'translateY(-50%) scale(1)'; e.currentTarget.style.opacity = '0.8'; }}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                            </button>
+                        </>
+                    )}
+
                     <div
                         onClick={e => e.stopPropagation()}
                         style={{
@@ -1349,57 +1432,232 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 <div style={{ width: '8px', height: '32px', background: 'linear-gradient(to bottom, #6366f1, #a855f7)', borderRadius: '4px' }} />
                                 <div>
-                                    <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>CONTEÚDO COMPLETO</div>
-                                    <div style={{ fontSize: '0.8rem', color: '#a5b4fc', fontWeight: 600, marginTop: '2px' }}>ID: {maximizedItem.id} &nbsp;·&nbsp; {maximizedItem.category || 'Geral'}</div>
+                                    <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                        {isEditingMaximized ? 'EDIÇÃO DE CONTEÚDO' : `CONTEÚDO COMPLETO (${filteredItems.findIndex(i => i.id === maximizedItem.id) + 1} de ${filteredItems.length})`}
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: '#a5b4fc', fontWeight: 600, marginTop: '2px' }}>ID: {maximizedItem.id} &nbsp;·&nbsp; {isEditingMaximized ? (
+                                    <input
+                                            value={maximizedForm.category}
+                                            onChange={e => setMaximizedForm({ ...maximizedForm, category: e.target.value })}
+                                            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', padding: '2px 8px', color: 'white', fontSize: '0.8rem', outline: 'none', transition: 'all 0.2s' }}
+                                        />
+                                    ) : (maximizedItem.category || 'Geral')}</div>
                                 </div>
                             </div>
-                            <button
-                                onClick={() => setMaximizedItem(null)}
-                                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', width: '36px', height: '36px', borderRadius: '10px', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
-                                onMouseEnter={e => { e.currentTarget.style.background = '#ef4444'; e.currentTarget.style.color = 'white'; }}
-                                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = '#94a3b8'; }}
-                            >✕</button>
+                            {!isEditingMaximized && (
+                                <button
+                                    onClick={() => setMaximizedItem(null)}
+                                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', width: '36px', height: '36px', borderRadius: '10px', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
+                                    onMouseEnter={e => { e.currentTarget.style.background = '#ef4444'; e.currentTarget.style.color = 'white'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = '#94a3b8'; }}
+                                >✕</button>
+                            )}
                         </div>
 
                         {/* Content */}
                         <div style={{ padding: '2rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                             {/* Metadata */}
-                            {maximizedItem.metadata && (
-                                <div>
-                                    <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '10px' }}>🏷️ {kbLabels.metadata}</div>
-                                    <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '12px', padding: '1rem 1.5rem', color: '#e2e8f0', fontSize: '0.95rem', fontWeight: 600 }}>
-                                        {maximizedItem.metadata}
-                                    </div>
+                            <div>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                    <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '1.5px' }}>🏷️ {kbLabels.metadata}</div>
+                                    {!isEditingMaximized && (
+                                        <button 
+                                            onClick={() => setShowJsonView(!showJsonView)}
+                                            style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: '#f59e0b', borderRadius: '6px', padding: '2px 8px', fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                        >
+                                            {showJsonView ? (
+                                                <><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg> Ver Lista</>
+                                            ) : (
+                                                <><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg> Ver JSON</>
+                                            )}
+                                        </button>
+                                    )}
                                 </div>
-                            )}
+                                
+                                {isEditingMaximized ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)', borderRadius: '12px', padding: '12px' }}>
+                                        {metadataEditorItems.map((item, idx) => (
+                                            <div key={item.id} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                <input
+                                                    value={item.key}
+                                                    placeholder="Nome"
+                                                    onChange={e => {
+                                                        const newItems = [...metadataEditorItems];
+                                                        newItems[idx].key = e.target.value;
+                                                        setMetadataEditorItems(newItems);
+                                                    }}
+                                                    style={{ flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '6px', padding: '6px 10px', color: 'white', fontSize: '0.85rem', outline: 'none' }}
+                                                />
+                                                <span style={{ color: '#f59e0b', fontWeight: 900 }}>:</span>
+                                                <input
+                                                    value={item.value}
+                                                    placeholder="Valor"
+                                                    onChange={e => {
+                                                        const newItems = [...metadataEditorItems];
+                                                        newItems[idx].value = e.target.value;
+                                                        setMetadataEditorItems(newItems);
+                                                    }}
+                                                    style={{ flex: 2, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '6px', padding: '6px 10px', color: '#cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                                                />
+                                                <button
+                                                    onClick={() => setMetadataEditorItems(metadataEditorItems.filter((_, i) => i !== idx))}
+                                                    style={{ background: 'rgba(239,68,68,0.1)', border: 'none', color: '#ef4444', width: '28px', height: '28px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                                                </button>
+                                            </div>
+                                        ))}
+                                        <button
+                                            onClick={() => setMetadataEditorItems([...metadataEditorItems, { id: Math.random().toString(36).substr(2, 9), key: '', value: '' }])}
+                                            style={{ marginTop: '4px', background: 'rgba(99,102,241,0.1)', border: '1px dashed rgba(99,102,241,0.3)', color: '#a5b4fc', borderRadius: '6px', padding: '6px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Adicionar Variável
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '12px', padding: '1rem 1.5rem', color: '#e2e8f0', fontSize: '0.95rem', fontWeight: 600 }}>
+                                        {showJsonView ? (
+                                            <pre style={{ margin: 0, fontSize: '0.8rem', fontFamily: 'monospace', color: '#fbbf24', overflowX: 'auto', whiteSpace: 'pre-wrap' }}>
+                                                {(() => {
+                                                    const raw = maximizedItem.metadata_val || maximizedItem.metadata || '{}';
+                                                    try {
+                                                        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                                                        return JSON.stringify(parsed, null, 2);
+                                                    } catch (e) {
+                                                        return String(raw);
+                                                    }
+                                                })()}
+                                            </pre>
+                                        ) : (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                {(() => {
+                                                    const raw = maximizedItem.metadata_val || maximizedItem.metadata || '';
+                                                    try {
+                                                        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                                                        if (parsed && typeof parsed === 'object') {
+                                                            const entries = Object.entries(parsed);
+                                                            if (entries.length === 0) return 'Nenhum metadado';
+                                                            return entries.map(([k, v]) => (
+                                                                <div key={k} style={{ display: 'flex', gap: '8px' }}>
+                                                                    <span style={{ color: '#f59e0b', fontSize: '0.85rem' }}>{k}:</span>
+                                                                    <span style={{ color: '#cbd5e1', fontSize: '0.85rem' }}>{typeof v === 'object' ? JSON.stringify(v) : String(v)}</span>
+                                                                </div>
+                                                            ));
+                                                        }
+                                                    } catch (e) {}
+                                                    return raw || 'Nenhum metadado';
+                                                })()}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                             {/* Question */}
                             <div>
                                 <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '10px' }}>❓ {kbLabels.question}</div>
-                                <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '12px', padding: '1.25rem 1.5rem', color: '#e2e8f0', fontSize: '1rem', fontWeight: 600, lineHeight: 1.6 }}>
-                                    {maximizedItem.question}
-                                </div>
+                                {isEditingMaximized ? (
+                                    <textarea
+                                        value={maximizedForm.question}
+                                        onChange={e => setMaximizedForm({ ...maximizedForm, question: e.target.value })}
+                                        style={{ width: '100%', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '12px', padding: '1.25rem 1.5rem', color: '#e2e8f0', fontSize: '1rem', fontWeight: 600, lineHeight: 1.6, minHeight: '100px', outline: 'none', resize: 'vertical', transition: 'all 0.2s' }}
+                                    />
+                                ) : (
+                                    <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '12px', padding: '1.25rem 1.5rem', color: '#e2e8f0', fontSize: '1rem', fontWeight: 600, lineHeight: 1.6 }}>
+                                        {maximizedItem.question}
+                                    </div>
+                                )}
                             </div>
                             {/* Answer */}
                             <div>
                                 <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#10b981', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '10px' }}>💬 {kbLabels.answer}</div>
-                                <div style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.15)', borderRadius: '12px', padding: '1.25rem 1.5rem', color: '#cbd5e1', fontSize: '0.95rem', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
-                                    {maximizedItem.answer}
-                                </div>
+                                {isEditingMaximized ? (
+                                    <textarea
+                                        value={maximizedForm.answer}
+                                        onChange={e => setMaximizedForm({ ...maximizedForm, answer: e.target.value })}
+                                        style={{ width: '100%', background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.15)', borderRadius: '12px', padding: '1.25rem 1.5rem', color: '#cbd5e1', fontSize: '0.95rem', lineHeight: 1.8, minHeight: '200px', outline: 'none', resize: 'vertical', transition: 'all 0.2s' }}
+                                    />
+                                ) : (
+                                    <div style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.15)', borderRadius: '12px', padding: '1.25rem 1.5rem', color: '#cbd5e1', fontSize: '0.95rem', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
+                                        {maximizedItem.answer}
+                                    </div>
+                                )}
                             </div>
                         </div>
 
                         {/* Footer */}
                         <div style={{ padding: '1rem 2rem', borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <div style={{ display: 'flex', gap: '12px' }}>
-                                <span style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '8px', padding: '4px 12px', fontSize: '0.75rem', color: '#a5b4fc', fontWeight: 700 }}>{maximizedItem.category || 'Geral'}</span>
-                                <span style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '4px 12px', fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>
-                                    📏 {(maximizedItem.question?.length || 0) + (maximizedItem.answer?.length || 0) + (maximizedItem.metadata?.length || 0)} chars · 🪙 ~{Math.ceil(((maximizedItem.question?.length || 0) + (maximizedItem.answer?.length || 0) + (maximizedItem.metadata?.length || 0)) / 4)} tokens
-                                </span>
+                                {isEditingMaximized ? (
+                                    <span style={{ color: '#64748b', fontSize: '0.75rem', display: 'flex', alignItems: 'center' }}>Modo de Edição Ativo</span>
+                                ) : (
+                                    <>
+                                        <span style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '8px', padding: '4px 12px', fontSize: '0.75rem', color: '#a5b4fc', fontWeight: 700 }}>{maximizedItem.category || 'Geral'}</span>
+                                        <span style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '4px 12px', fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>
+                                            📏 {(maximizedItem.question?.length || 0) + (maximizedItem.answer?.length || 0) + (maximizedItem.metadata_val?.length || 0) + (maximizedItem.metadata?.length || 0)} chars
+                                        </span>
+                                    </>
+                                )}
                             </div>
-                            <button
-                                onClick={() => setMaximizedItem(null)}
-                                style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', color: '#a5b4fc', borderRadius: '10px', padding: '8px 18px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}
-                            >Fechar</button>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                {isEditingMaximized ? (
+                                    <>
+                                        <button
+                                            onClick={() => { setIsEditingMaximized(false); setMaximizedForm(null); }}
+                                            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', borderRadius: '10px', padding: '8px 18px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}
+                                        >Cancelar</button>
+                                        <button
+                                            onClick={handleUpdateMaximized}
+                                            disabled={isSavingMaximized}
+                                            style={{ background: 'linear-gradient(to right, #6366f1, #a855f7)', border: 'none', color: 'white', borderRadius: '10px', padding: '8px 24px', fontSize: '0.85rem', fontWeight: 700, cursor: isSavingMaximized ? 'not-allowed' : 'pointer', opacity: isSavingMaximized ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '8px' }}
+                                        >
+                                            {isSavingMaximized ? 'Salvando...' : 'Atualizar'}
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <button
+                                            onClick={() => {
+                                                const rawMetadata = maximizedItem.metadata_val || maximizedItem.metadata || '';
+                                                let parsedMetadata = [];
+                                                
+                                                try {
+                                                    const metaObj = typeof rawMetadata === 'string' ? JSON.parse(rawMetadata) : rawMetadata;
+                                                    if (metaObj && typeof metaObj === 'object') {
+                                                        parsedMetadata = Object.entries(metaObj).map(([key, value]) => ({
+                                                            id: Math.random().toString(36).substr(2, 9),
+                                                            key,
+                                                            value: typeof value === 'object' ? JSON.stringify(value) : String(value)
+                                                        }));
+                                                    }
+                                                } catch (e) {
+                                                    // Se não for JSON, trata como string simples se houver conteúdo
+                                                    if (rawMetadata) {
+                                                        parsedMetadata = [{ id: 'default', key: 'info', value: String(rawMetadata) }];
+                                                    }
+                                                }
+
+                                                if (parsedMetadata.length === 0) {
+                                                    parsedMetadata = [{ id: Math.random().toString(36).substr(2, 9), key: '', value: '' }];
+                                                }
+
+                                                setMetadataEditorItems(parsedMetadata);
+                                                setMaximizedForm({
+                                                    question: maximizedItem.question,
+                                                    answer: maximizedItem.answer,
+                                                    category: maximizedItem.category || 'Geral',
+                                                    metadata_val: rawMetadata
+                                                });
+                                                setIsEditingMaximized(true);
+                                            }}
+                                            style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', color: '#a5b4fc', borderRadius: '10px', padding: '8px 18px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}
+                                        >Editar</button>
+                                        <button
+                                            onClick={() => setMaximizedItem(null)}
+                                            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', borderRadius: '10px', padding: '8px 18px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}
+                                        >Fechar</button>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>, document.body
@@ -2254,12 +2512,12 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                 }}>
 
                     {/* PHASE 1: LOADING & PROGRESS */}
-                    <div className="fade-in" style={{ 
-                        maxWidth: '800px', 
-                        width: '100%', 
-                        display: 'flex', 
-                        flexDirection: 'column', 
-                        alignItems: 'center', 
+                    <div className="fade-in" style={{
+                        maxWidth: '800px',
+                        width: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
                         marginBottom: transcriptionProgress < 100 ? '0' : '40px',
                         transition: 'all 0.5s ease'
                     }}>
@@ -2290,9 +2548,9 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                             </div>
                         </div>
 
-                        <h2 style={{ 
-                            fontSize: transcriptionProgress < 100 ? '2.5rem' : '1.8rem', 
-                            fontWeight: 900, 
+                        <h2 style={{
+                            fontSize: transcriptionProgress < 100 ? '2.5rem' : '1.8rem',
+                            fontWeight: 900,
                             marginBottom: '12px',
                             background: 'linear-gradient(to right, #fff, #94a3b8)',
                             WebkitBackgroundClip: 'text',
@@ -2302,52 +2560,52 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                         }}>
                             {transcriptionProgress < 100 ? "Preparando seu Conteúdo..." : "Transcrição Concluída!"}
                         </h2>
-                        
-                        <div style={{ 
-                            display: 'flex', 
+
+                        <div style={{
+                            display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
-                            gap: '15px', 
-                            width: '100%', 
-                            maxWidth: '500px', 
-                            marginTop: '10px' 
+                            gap: '15px',
+                            width: '100%',
+                            maxWidth: '500px',
+                            marginTop: '10px'
                         }}>
-                            <div style={{ 
+                            <div style={{
                                 width: '100%',
-                                background: 'rgba(255,255,255,0.05)', 
-                                height: '12px', 
+                                background: 'rgba(255,255,255,0.05)',
+                                height: '12px',
                                 borderRadius: '12px',
                                 overflow: 'hidden',
                                 position: 'relative',
                                 border: '1px solid rgba(255,255,255,0.1)'
                             }}>
-                                <div style={{ 
-                                    width: `${transcriptionProgress}%`, 
-                                    height: '100%', 
-                                    background: transcriptionProgress < 100 ? 'linear-gradient(90deg, #6366f1, #a855f7)' : '#10b981', 
+                                <div style={{
+                                    width: `${transcriptionProgress}%`,
+                                    height: '100%',
+                                    background: transcriptionProgress < 100 ? 'linear-gradient(90deg, #6366f1, #a855f7)' : '#10b981',
                                     transition: 'width 0.4s ease',
                                     boxShadow: transcriptionProgress < 100 ? '0 0 20px rgba(99, 102, 241, 0.5)' : '0 0 20px rgba(16, 185, 129, 0.5)'
                                 }}></div>
                             </div>
-                            <div style={{ 
-                                color: transcriptionProgress < 100 ? '#6366f1' : '#10b981', 
-                                fontWeight: 900, 
+                            <div style={{
+                                color: transcriptionProgress < 100 ? '#6366f1' : '#10b981',
+                                fontWeight: 900,
                                 fontSize: '1.4rem',
                                 letterSpacing: '1px'
                             }}>
                                 {Math.round(transcriptionProgress)}%
                             </div>
                         </div>
-                        
-                        <p style={{ 
-                            color: '#94a3b8', 
-                            fontSize: '1.1rem', 
+
+                        <p style={{
+                            color: '#94a3b8',
+                            fontSize: '1.1rem',
                             marginTop: '20px',
                             maxWidth: '600px',
                             lineHeight: 1.6
                         }}>
-                            {transcriptionProgress < 100 
-                                ? "Enviando e transcrevendo via AssemblyAI. Nossa IA está processando cada palavra com precisão cirúrgica..." 
+                            {transcriptionProgress < 100
+                                ? "Enviando e transcrevendo via AssemblyAI. Nossa IA está processando cada palavra com precisão cirúrgica..."
                                 : "Excelente! O texto foi extraído com sucesso. Agora, escolha como deseja organizar este conhecimento."}
                         </p>
                     </div>
@@ -2394,16 +2652,16 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                                     <label style={{ display: 'block', color: '#6366f1', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>📄 Conteúdo Transcrito</label>
                                     <div style={{ display: 'flex', gap: '10px' }}>
-                                        <button 
+                                        <button
                                             onClick={() => setShowMaximizedTranscription(true)}
-                                            style={{ 
-                                                background: 'rgba(99, 102, 241, 0.1)', 
-                                                border: '1px solid rgba(99, 102, 241, 0.2)', 
-                                                color: '#a5b4fc', 
-                                                borderRadius: '8px', 
-                                                padding: '4px 12px', 
-                                                fontSize: '0.7rem', 
-                                                fontWeight: 800, 
+                                            style={{
+                                                background: 'rgba(99, 102, 241, 0.1)',
+                                                border: '1px solid rgba(99, 102, 241, 0.2)',
+                                                color: '#a5b4fc',
+                                                borderRadius: '8px',
+                                                padding: '4px 12px',
+                                                fontSize: '0.7rem',
+                                                fontWeight: 800,
                                                 cursor: 'pointer',
                                                 display: 'flex',
                                                 alignItems: 'center',
@@ -2417,15 +2675,15 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                                         </button>
                                     </div>
                                 </div>
-                                <div style={{ 
-                                    background: 'rgba(0,0,0,0.2)', 
-                                    border: '1px solid rgba(255,255,255,0.05)', 
-                                    borderRadius: '16px', 
-                                    padding: '20px', 
-                                    color: '#cbd5e1', 
-                                    fontSize: '0.9rem', 
-                                    lineHeight: 1.6, 
-                                    maxHeight: '150px', 
+                                <div style={{
+                                    background: 'rgba(0,0,0,0.2)',
+                                    border: '1px solid rgba(255,255,255,0.05)',
+                                    borderRadius: '16px',
+                                    padding: '20px',
+                                    color: '#cbd5e1',
+                                    fontSize: '0.9rem',
+                                    lineHeight: 1.6,
+                                    maxHeight: '150px',
                                     overflowY: 'auto',
                                     whiteSpace: 'pre-wrap',
                                     position: 'relative'
@@ -2435,7 +2693,7 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
 
                                 <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                                     <div style={{ flex: 1, minWidth: '200px' }}>
-                                        <input 
+                                        <input
                                             type="text"
                                             placeholder="Nome do arquivo (ex: reuniao_vendas)"
                                             value={transcriptionFilename}
@@ -2451,10 +2709,10 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                                             }}
                                         />
                                     </div>
-                                    <button 
+                                    <button
                                         onClick={() => {
                                             const element = document.createElement("a");
-                                            const file = new Blob([transcriptionResult], {type: 'text/plain'});
+                                            const file = new Blob([transcriptionResult], { type: 'text/plain' });
                                             element.href = URL.createObjectURL(file);
                                             const finalName = (transcriptionFilename || `transcricao_${new Date().getTime()}`).replace(/[^a-z0-9]/gi, '_').toLowerCase();
                                             element.download = `${finalName}.txt`;
@@ -2462,14 +2720,14 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                                             element.click();
                                             document.body.removeChild(element);
                                         }}
-                                        style={{ 
-                                            background: 'rgba(99, 102, 241, 0.1)', 
-                                            border: '1px solid rgba(99, 102, 241, 0.2)', 
-                                            color: '#a5b4fc', 
-                                            borderRadius: '10px', 
-                                            padding: '10px 20px', 
-                                            fontSize: '0.85rem', 
-                                            fontWeight: 800, 
+                                        style={{
+                                            background: 'rgba(99, 102, 241, 0.1)',
+                                            border: '1px solid rgba(99, 102, 241, 0.2)',
+                                            color: '#a5b4fc',
+                                            borderRadius: '10px',
+                                            padding: '10px 20px',
+                                            fontSize: '0.85rem',
+                                            fontWeight: 800,
                                             cursor: 'pointer',
                                             display: 'flex',
                                             alignItems: 'center',
@@ -2486,7 +2744,7 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-                                <div 
+                                <div
                                     className={`config-option ${ragConfig.extractQA ? 'active' : ''}`}
                                     onClick={() => setRagConfig(prev => ({ ...prev, extractQA: !prev.extractQA }))}
                                     style={{
@@ -2501,7 +2759,7 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                                     {ragConfig.extractQA && <div style={{ position: 'absolute', top: '15px', right: '15px', background: '#6366f1', color: 'white', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 900 }}>✓</div>}
                                 </div>
 
-                                <div 
+                                <div
                                     className={`config-option ${ragConfig.extractChunks ? 'active' : ''}`}
                                     onClick={() => setRagConfig(prev => ({ ...prev, extractChunks: !prev.extractChunks }))}
                                     style={{
@@ -2516,7 +2774,7 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                                     {ragConfig.extractChunks && <div style={{ position: 'absolute', top: '15px', right: '15px', background: '#10b981', color: 'white', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 900 }}>✓</div>}
                                 </div>
 
-                                <div 
+                                <div
                                     className={`config-option ${ragConfig.generateSummary ? 'active' : ''}`}
                                     onClick={() => setRagConfig(prev => ({ ...prev, generateSummary: !prev.generateSummary }))}
                                     style={{
@@ -2538,24 +2796,24 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                                         <div>
                                             <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '1px' }}>Tamanho do Bloco</label>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                                <input 
+                                                <input
                                                     type="range" min="500" max="4000" step="100"
                                                     value={ragConfig.chunkSize}
                                                     onChange={e => setRagConfig(prev => ({ ...prev, chunkSize: parseInt(e.target.value) }))}
                                                     style={{ flex: 1, accentColor: '#10b981' }}
                                                 />
-                                                <input 
+                                                <input
                                                     type="number"
                                                     value={ragConfig.chunkSize}
                                                     onChange={e => setRagConfig(prev => ({ ...prev, chunkSize: parseInt(e.target.value) || 0 }))}
-                                                    style={{ 
-                                                        width: '70px', 
-                                                        background: 'rgba(16, 185, 129, 0.2)', 
-                                                        color: 'white', 
-                                                        fontWeight: 900, 
-                                                        border: '1px solid rgba(16, 185, 129, 0.3)', 
-                                                        borderRadius: '8px', 
-                                                        padding: '4px 8px', 
+                                                    style={{
+                                                        width: '70px',
+                                                        background: 'rgba(16, 185, 129, 0.2)',
+                                                        color: 'white',
+                                                        fontWeight: 900,
+                                                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                                                        borderRadius: '8px',
+                                                        padding: '4px 8px',
                                                         textAlign: 'center',
                                                         outline: 'none'
                                                     }}
@@ -2565,24 +2823,24 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                                         <div>
                                             <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '1px' }}>Sobreposição</label>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                                <input 
+                                                <input
                                                     type="range" min="0" max="2000" step="10"
                                                     value={ragConfig.chunkOverlap}
                                                     onChange={e => setRagConfig(prev => ({ ...prev, chunkOverlap: parseInt(e.target.value) }))}
                                                     style={{ flex: 1, accentColor: '#6366f1' }}
                                                 />
-                                                <input 
+                                                <input
                                                     type="number"
                                                     value={ragConfig.chunkOverlap}
                                                     onChange={e => setRagConfig(prev => ({ ...prev, chunkOverlap: parseInt(e.target.value) || 0 }))}
-                                                    style={{ 
-                                                        width: '70px', 
-                                                        background: 'rgba(99, 102, 241, 0.2)', 
-                                                        color: 'white', 
-                                                        fontWeight: 900, 
-                                                        border: '1px solid rgba(99, 102, 241, 0.3)', 
-                                                        borderRadius: '8px', 
-                                                        padding: '4px 8px', 
+                                                    style={{
+                                                        width: '70px',
+                                                        background: 'rgba(99, 102, 241, 0.2)',
+                                                        color: 'white',
+                                                        fontWeight: 900,
+                                                        border: '1px solid rgba(99, 102, 241, 0.3)',
+                                                        borderRadius: '8px',
+                                                        padding: '4px 8px',
                                                         textAlign: 'center',
                                                         outline: 'none'
                                                     }}
@@ -2595,7 +2853,7 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
 
                             <div style={{ marginBottom: '40px' }}>
                                 <label style={{ display: 'block', color: '#818cf8', fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '1px' }}>🏷️ Metadados do Conteúdo</label>
-                                <input 
+                                <input
                                     type="text"
                                     placeholder="Ex: Aula de Biologia, Módulo 01..."
                                     value={ragConfig.metadata}
@@ -2615,25 +2873,25 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                             </div>
 
                             <div style={{ display: 'flex', gap: '16px' }}>
-                                <button 
+                                <button
                                     onClick={() => { setIsTranscribing(false); setSelectedVideoFile(null); }}
                                     style={{ flex: 1, padding: '16px', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none', borderRadius: '16px', fontWeight: 700, cursor: 'pointer' }}
                                 >
                                     Cancelar
                                 </button>
-                                <button 
+                                <button
                                     onClick={handleCreateRag}
                                     disabled={isCreatingRag}
-                                    style={{ 
-                                        flex: 2, 
-                                        padding: '16px', 
-                                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
-                                        color: 'white', 
-                                        border: 'none', 
-                                        borderRadius: '20px', 
-                                        fontWeight: 900, 
+                                    style={{
+                                        flex: 2,
+                                        padding: '16px',
+                                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '20px',
+                                        fontWeight: 900,
                                         fontSize: '1.2rem',
-                                        cursor: 'pointer', 
+                                        cursor: 'pointer',
                                         boxShadow: '0 15px 35px rgba(16, 185, 129, 0.4)',
                                         display: 'flex',
                                         alignItems: 'center',
@@ -2865,7 +3123,7 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px' }}>
-                            <div 
+                            <div
                                 className={`config-option ${ragConfig.generateSummary ? 'active' : ''}`}
                                 onClick={() => setRagConfig(prev => ({ ...prev, generateSummary: !prev.generateSummary }))}
                                 style={{
@@ -2881,8 +3139,8 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                                     <div style={{ color: '#cbd5e1', fontSize: '0.8rem', marginTop: '2px' }}>Cria um resumo consolidado de todo o conteúdo.</div>
                                 </div>
                             </div>
-                            
-                            <div 
+
+                            <div
                                 className={`config-option ${ragConfig.extractQA ? 'active' : ''}`}
                                 onClick={() => setRagConfig(prev => ({ ...prev, extractQA: !prev.extractQA }))}
                                 style={{
@@ -2899,7 +3157,7 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                                 </div>
                             </div>
 
-                            <div 
+                            <div
                                 className={`config-option ${ragConfig.extractChunks ? 'active' : ''}`}
                                 onClick={() => setRagConfig(prev => ({ ...prev, extractChunks: !prev.extractChunks }))}
                                 style={{
@@ -2923,24 +3181,24 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                                     <div>
                                         <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '10px' }}>Tamanho do Chunk (Chars)</label>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <input 
+                                            <input
                                                 type="range" min="500" max="4000" step="100"
                                                 value={ragConfig.chunkSize}
                                                 onChange={e => setRagConfig(prev => ({ ...prev, chunkSize: parseInt(e.target.value) }))}
                                                 style={{ flex: 1, accentColor: '#10b981' }}
                                             />
-                                            <input 
+                                            <input
                                                 type="number"
                                                 value={ragConfig.chunkSize}
                                                 onChange={e => setRagConfig(prev => ({ ...prev, chunkSize: parseInt(e.target.value) || 0 }))}
-                                                style={{ 
-                                                    width: '65px', 
-                                                    background: 'rgba(16, 185, 129, 0.1)', 
-                                                    color: 'white', 
-                                                    fontWeight: 800, 
-                                                    border: '1px solid rgba(16, 185, 129, 0.2)', 
-                                                    borderRadius: '6px', 
-                                                    padding: '2px 5px', 
+                                                style={{
+                                                    width: '65px',
+                                                    background: 'rgba(16, 185, 129, 0.1)',
+                                                    color: 'white',
+                                                    fontWeight: 800,
+                                                    border: '1px solid rgba(16, 185, 129, 0.2)',
+                                                    borderRadius: '6px',
+                                                    padding: '2px 5px',
                                                     textAlign: 'center',
                                                     outline: 'none'
                                                 }}
@@ -2950,24 +3208,24 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                                     <div>
                                         <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '10px' }}>Sobreposição (Overlay)</label>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <input 
+                                            <input
                                                 type="range" min="0" max="2000" step="10"
                                                 value={ragConfig.chunkOverlap}
                                                 onChange={e => setRagConfig(prev => ({ ...prev, chunkOverlap: parseInt(e.target.value) }))}
                                                 style={{ flex: 1, accentColor: '#818cf8' }}
                                             />
-                                            <input 
+                                            <input
                                                 type="number"
                                                 value={ragConfig.chunkOverlap}
                                                 onChange={e => setRagConfig(prev => ({ ...prev, chunkOverlap: parseInt(e.target.value) || 0 }))}
-                                                style={{ 
-                                                    width: '65px', 
-                                                    background: 'rgba(129, 140, 248, 0.1)', 
-                                                    color: 'white', 
-                                                    fontWeight: 800, 
-                                                    border: '1px solid rgba(129, 140, 248, 0.2)', 
-                                                    borderRadius: '6px', 
-                                                    padding: '2px 5px', 
+                                                style={{
+                                                    width: '65px',
+                                                    background: 'rgba(129, 140, 248, 0.1)',
+                                                    color: 'white',
+                                                    fontWeight: 800,
+                                                    border: '1px solid rgba(129, 140, 248, 0.2)',
+                                                    borderRadius: '6px',
+                                                    padding: '2px 5px',
                                                     textAlign: 'center',
                                                     outline: 'none'
                                                 }}
@@ -2981,37 +3239,37 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                         <div className="form-group" style={{ marginBottom: '32px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                                 <label style={{ margin: 0, color: '#818cf8', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>Metadados Comuns</label>
-                                <button 
-                                    type="button" 
+                                <button
+                                    type="button"
                                     onClick={() => setIsJsonModalOpen(true)}
                                     style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
                                     {`{ JSON }`}
                                 </button>
                             </div>
-                            
+
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                 {metadata.map((item, index) => (
                                     <div key={index} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                        <input 
-                                            type="text" 
-                                            placeholder="Nome (Ex: categoria)" 
+                                        <input
+                                            type="text"
+                                            placeholder="Nome (Ex: categoria)"
                                             style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '12px 16px', color: 'white', fontSize: '0.95rem', outline: 'none' }}
                                             value={item.name}
                                             onChange={(e) => handleMetadataChange(index, 'name', e.target.value)}
                                             onFocus={e => e.target.style.borderColor = '#6366f1'}
                                             onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
                                         />
-                                        <input 
-                                            type="text" 
-                                            placeholder="Conteúdo (Ex: Tecnologia)" 
+                                        <input
+                                            type="text"
+                                            placeholder="Conteúdo (Ex: Tecnologia)"
                                             style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '12px 16px', color: 'white', fontSize: '0.95rem', outline: 'none' }}
                                             value={item.content}
                                             onChange={(e) => handleMetadataChange(index, 'content', e.target.value)}
                                             onFocus={e => e.target.style.borderColor = '#6366f1'}
                                             onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
                                         />
-                                        <button 
-                                            type="button" 
+                                        <button
+                                            type="button"
                                             onClick={() => removeMetadataRow(index)}
                                             title="Remover"
                                             style={{ background: '#ef4444', color: '#fff', border: 'none', width: '42px', height: '42px', borderRadius: '12px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '18px', transition: 'background 0.2s' }}
@@ -3023,9 +3281,9 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                                     </div>
                                 ))}
                             </div>
-                            
-                            <button 
-                                type="button" 
+
+                            <button
+                                type="button"
                                 onClick={addMetadataRow}
                                 style={{ background: 'rgba(255,255,255,0.05)', color: 'white', border: '1px dashed rgba(255,255,255,0.2)', padding: '12px', borderRadius: '12px', cursor: 'pointer', marginTop: '16px', width: '100%', fontWeight: '600', transition: 'all 0.2s' }}
                                 onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)'; }}
@@ -3036,25 +3294,25 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                         </div>
 
                         <div style={{ display: 'flex', gap: '16px' }}>
-                            <button 
+                            <button
                                 onClick={() => setShowRagConfigPopup(false)}
                                 style={{ flex: 1, padding: '16px', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none', borderRadius: '16px', fontWeight: 700, cursor: 'pointer' }}
                             >
                                 Cancelar
                             </button>
-                            <button 
+                            <button
                                 onClick={handleCreateRag}
                                 disabled={isCreatingRag}
-                                style={{ 
-                                    flex: 2, 
-                                    padding: '16px', 
-                                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
-                                    color: 'white', 
-                                    border: 'none', 
-                                    borderRadius: '16px', 
-                                    fontWeight: 900, 
+                                style={{
+                                    flex: 2,
+                                    padding: '16px',
+                                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '16px',
+                                    fontWeight: 900,
                                     fontSize: '1.1rem',
-                                    cursor: 'pointer', 
+                                    cursor: 'pointer',
                                     boxShadow: '0 10px 25px rgba(16, 185, 129, 0.4)',
                                     display: 'flex',
                                     alignItems: 'center',
@@ -3091,10 +3349,10 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                     }}>
                         <h3 style={{ marginTop: 0, marginBottom: '15px', color: 'white', fontSize: '1.5rem', fontWeight: 800 }}>Importar JSON</h3>
                         <p style={{ color: '#94a3b8', fontSize: '0.95rem', marginBottom: '20px' }}>Cole abaixo o JSON contendo os metadados. Valores existentes serão substituídos ou mesclados.</p>
-                        <textarea 
-                            style={{ 
-                                width: '100%', height: '200px', fontFamily: 'monospace', 
-                                padding: '16px', background: 'rgba(255,255,255,0.03)', color: '#e2e8f0', 
+                        <textarea
+                            style={{
+                                width: '100%', height: '200px', fontFamily: 'monospace',
+                                padding: '16px', background: 'rgba(255,255,255,0.03)', color: '#e2e8f0',
                                 border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px',
                                 outline: 'none', resize: 'vertical'
                             }}
@@ -3105,15 +3363,15 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                             onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
                         />
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
-                            <button 
-                                type="button" 
+                            <button
+                                type="button"
                                 onClick={() => setIsJsonModalOpen(false)}
                                 style={{ padding: '12px 24px', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 600, cursor: 'pointer' }}
                             >
                                 Cancelar
                             </button>
-                            <button 
-                                type="button" 
+                            <button
+                                type="button"
                                 onClick={handleJsonMerge}
                                 style={{ padding: '12px 24px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)' }}
                             >
@@ -3149,15 +3407,15 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                         boxShadow: '0 40px 80px rgba(0,0,0,0.8), 0 0 40px rgba(16, 185, 129, 0.1)',
                         animation: 'modalPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)'
                     }}>
-                        <div style={{ 
-                            width: '90px', 
-                            height: '90px', 
-                            background: 'rgba(16, 185, 129, 0.1)', 
-                            borderRadius: '30px', 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center', 
-                            fontSize: '3.5rem', 
+                        <div style={{
+                            width: '90px',
+                            height: '90px',
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            borderRadius: '30px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '3.5rem',
                             margin: '0 auto 24px auto',
                             border: '1px solid rgba(16, 185, 129, 0.2)',
                             boxShadow: '0 10px 30px rgba(16, 185, 129, 0.2)'
@@ -3168,16 +3426,16 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                         <p style={{ color: '#94a3b8', fontSize: '1.05rem', lineHeight: 1.6, marginBottom: '32px' }}>
                             O conteúdo foi processado, otimizado e já está disponível na sua Base de Conhecimento para o seu agente.
                         </p>
-                        <button 
+                        <button
                             onClick={() => window.location.reload()}
-                            style={{ 
-                                width: '100%', 
-                                padding: '18px', 
-                                background: '#10b981', 
-                                color: 'white', 
-                                border: 'none', 
-                                borderRadius: '18px', 
-                                fontWeight: 900, 
+                            style={{
+                                width: '100%',
+                                padding: '18px',
+                                background: '#10b981',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '18px',
+                                fontWeight: 900,
                                 fontSize: '1.1rem',
                                 cursor: 'pointer',
                                 boxShadow: '0 10px 20px rgba(16, 185, 129, 0.3)',
@@ -3217,7 +3475,7 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                 document.body
             )}
             {showMaximizedTranscription && document.body && createPortal(
-                <div 
+                <div
                     style={{
                         position: 'fixed', inset: 0, zIndex: 200000,
                         background: 'rgba(2, 6, 23, 0.85)',
@@ -3227,7 +3485,7 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                     }}
                     onClick={() => setShowMaximizedTranscription(false)}
                 >
-                    <div 
+                    <div
                         style={{
                             background: 'linear-gradient(145deg, #0f172a 0%, #1e293b 100%)',
                             border: '1px solid rgba(99, 102, 241, 0.2)',
@@ -3246,7 +3504,7 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                                 <h3 style={{ color: 'white', margin: 0, fontSize: '1.25rem', fontWeight: 900 }}>📄 Visualização Completa</h3>
                                 <p style={{ color: '#64748b', margin: '4px 0 0 0', fontSize: '0.8rem' }}>Conteúdo integral da transcrição processada.</p>
                             </div>
-                            <button 
+                            <button
                                 onClick={() => setShowMaximizedTranscription(false)}
                                 style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#94a3b8', width: '40px', height: '40px', borderRadius: '12px', cursor: 'pointer', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
                                 onMouseEnter={e => { e.currentTarget.style.background = '#ef4444'; e.currentTarget.style.color = 'white'; }}
@@ -3254,10 +3512,10 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                             >✕</button>
                         </div>
                         <div style={{ padding: '40px', overflowY: 'auto', flex: 1 }}>
-                            <div style={{ 
-                                color: '#e2e8f0', 
-                                fontSize: '1rem', 
-                                lineHeight: 1.8, 
+                            <div style={{
+                                color: '#e2e8f0',
+                                fontSize: '1rem',
+                                lineHeight: 1.8,
                                 whiteSpace: 'pre-wrap',
                                 fontFamily: 'Inter, system-ui, sans-serif'
                             }}>
@@ -3266,7 +3524,7 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                         </div>
                         <div style={{ padding: '24px 40px', background: 'rgba(0,0,0,0.2)', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '20px' }}>
                             <div style={{ flex: 1, maxWidth: '400px' }}>
-                                <input 
+                                <input
                                     type="text"
                                     placeholder="Nome do arquivo personalizado..."
                                     value={transcriptionFilename}
@@ -3283,14 +3541,14 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                                 />
                             </div>
                             <div style={{ display: 'flex', gap: '16px' }}>
-                                <button 
+                                <button
                                     onClick={() => setShowMaximizedTranscription(false)}
                                     style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', borderRadius: '14px', padding: '12px 24px', fontWeight: 600, cursor: 'pointer' }}
                                 >Fechar</button>
-                                <button 
+                                <button
                                     onClick={() => {
                                         const element = document.createElement("a");
-                                        const file = new Blob([transcriptionResult], {type: 'text/plain'});
+                                        const file = new Blob([transcriptionResult], { type: 'text/plain' });
                                         element.href = URL.createObjectURL(file);
                                         const finalName = (transcriptionFilename || `transcricao_${new Date().getTime()}`).replace(/[^a-z0-9]/gi, '_').toLowerCase();
                                         element.download = `${finalName}.txt`;
@@ -3343,16 +3601,16 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                         <div style={{ display: 'grid', gap: '24px' }}>
                             <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'white', fontWeight: 800, marginBottom: '12px', cursor: 'pointer' }}>
-                                    <input 
-                                        type="checkbox" 
-                                        checked={bulkEditForm.useCategory} 
+                                    <input
+                                        type="checkbox"
+                                        checked={bulkEditForm.useCategory}
                                         onChange={e => setBulkEditForm(prev => ({ ...prev, useCategory: e.target.checked }))}
                                         style={{ accentColor: '#6366f1', transform: 'scale(1.2)' }}
                                     />
                                     Alterar Categoria
                                 </label>
                                 {bulkEditForm.useCategory && (
-                                    <input 
+                                    <input
                                         type="text"
                                         placeholder="Nova categoria..."
                                         value={bulkEditForm.category}
@@ -3364,16 +3622,16 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
 
                             <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'white', fontWeight: 800, marginBottom: '12px', cursor: 'pointer' }}>
-                                    <input 
-                                        type="checkbox" 
-                                        checked={bulkEditForm.useMetadata} 
+                                    <input
+                                        type="checkbox"
+                                        checked={bulkEditForm.useMetadata}
                                         onChange={e => setBulkEditForm(prev => ({ ...prev, useMetadata: e.target.checked }))}
                                         style={{ accentColor: '#6366f1', transform: 'scale(1.2)' }}
                                     />
                                     Alterar {kbLabels.metadata}
                                 </label>
                                 {bulkEditForm.useMetadata && (
-                                    <input 
+                                    <input
                                         type="text"
                                         placeholder={`Novo ${kbLabels.metadata}...`}
                                         value={bulkEditForm.metadata_val}
@@ -3385,16 +3643,16 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
 
                             <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'white', fontWeight: 800, marginBottom: '12px', cursor: 'pointer' }}>
-                                    <input 
-                                        type="checkbox" 
-                                        checked={bulkEditForm.useQuestion} 
+                                    <input
+                                        type="checkbox"
+                                        checked={bulkEditForm.useQuestion}
                                         onChange={e => setBulkEditForm(prev => ({ ...prev, useQuestion: e.target.checked }))}
                                         style={{ accentColor: '#6366f1', transform: 'scale(1.2)' }}
                                     />
                                     Alterar {kbLabels.question} (Para todos os selecionados)
                                 </label>
                                 {bulkEditForm.useQuestion && (
-                                    <textarea 
+                                    <textarea
                                         placeholder={`Nova ${kbLabels.question}...`}
                                         value={bulkEditForm.question}
                                         onChange={e => setBulkEditForm(prev => ({ ...prev, question: e.target.value }))}
@@ -3405,16 +3663,16 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
 
                             <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'white', fontWeight: 800, marginBottom: '12px', cursor: 'pointer' }}>
-                                    <input 
-                                        type="checkbox" 
-                                        checked={bulkEditForm.useAnswer} 
+                                    <input
+                                        type="checkbox"
+                                        checked={bulkEditForm.useAnswer}
                                         onChange={e => setBulkEditForm(prev => ({ ...prev, useAnswer: e.target.checked }))}
                                         style={{ accentColor: '#6366f1', transform: 'scale(1.2)' }}
                                     />
                                     Alterar {kbLabels.answer} (Para todos os selecionados)
                                 </label>
                                 {bulkEditForm.useAnswer && (
-                                    <textarea 
+                                    <textarea
                                         placeholder={`Nova ${kbLabels.answer}...`}
                                         value={bulkEditForm.answer}
                                         onChange={e => setBulkEditForm(prev => ({ ...prev, answer: e.target.value }))}
@@ -3425,23 +3683,23 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                         </div>
 
                         <div style={{ display: 'flex', gap: '16px', marginTop: '40px' }}>
-                            <button 
+                            <button
                                 onClick={() => setIsBulkEditOpen(false)}
                                 style={{ flex: 1, padding: '16px', background: 'transparent', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '18px', fontWeight: 700, cursor: 'pointer' }}
                             >
                                 Cancelar
                             </button>
-                            <button 
+                            <button
                                 onClick={handleBulkUpdate}
                                 disabled={isBulkUpdating || (!bulkEditForm.useCategory && !bulkEditForm.useMetadata && !bulkEditForm.useQuestion && !bulkEditForm.useAnswer)}
-                                style={{ 
-                                    flex: 2, 
-                                    padding: '16px', 
-                                    background: isBulkUpdating ? '#475569' : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', 
-                                    color: 'white', 
-                                    border: 'none', 
-                                    borderRadius: '18px', 
-                                    fontWeight: 900, 
+                                style={{
+                                    flex: 2,
+                                    padding: '16px',
+                                    background: isBulkUpdating ? '#475569' : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '18px',
+                                    fontWeight: 900,
                                     cursor: isBulkUpdating ? 'not-allowed' : 'pointer',
                                     boxShadow: '0 10px 20px rgba(99, 102, 241, 0.2)'
                                 }}
@@ -3487,7 +3745,7 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                         <div style={{ display: 'grid', gap: '24px' }}>
                             <div style={{ background: 'rgba(255,255,255,0.02)', padding: '24px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                 <label style={{ display: 'block', color: '#818cf8', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '1px' }}>Pergunta / Título do Resumo</label>
-                                <textarea 
+                                <textarea
                                     placeholder="Ex: Resumo Geral do Módulo 01..."
                                     value={bulkSummarizeForm.question}
                                     onChange={e => setBulkSummarizeForm(prev => ({ ...prev, question: e.target.value }))}
@@ -3498,7 +3756,7 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                                 <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                     <label style={{ display: 'block', color: '#818cf8', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '10px' }}>Metadado do Item</label>
-                                    <input 
+                                    <input
                                         type="text"
                                         placeholder="Ex: Módulo 1..."
                                         value={bulkSummarizeForm.metadata_val}
@@ -3508,7 +3766,7 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                                 </div>
                                 <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                     <label style={{ display: 'block', color: '#818cf8', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '10px' }}>Categoria</label>
-                                    <input 
+                                    <input
                                         type="text"
                                         placeholder="Ex: Resumo..."
                                         value={bulkSummarizeForm.category}
@@ -3520,23 +3778,23 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                         </div>
 
                         <div style={{ display: 'flex', gap: '16px', marginTop: '40px' }}>
-                            <button 
+                            <button
                                 onClick={() => setIsBulkSummarizeOpen(false)}
                                 style={{ flex: 1, padding: '18px', background: 'transparent', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', fontWeight: 700, cursor: 'pointer' }}
                             >
                                 Cancelar
                             </button>
-                            <button 
+                            <button
                                 onClick={handleBulkSummarize}
                                 disabled={isSummarizing || !bulkSummarizeForm.question.trim()}
-                                style={{ 
-                                    flex: 2, 
-                                    padding: '18px', 
-                                    background: isSummarizing ? '#475569' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
-                                    color: 'white', 
-                                    border: 'none', 
-                                    borderRadius: '20px', 
-                                    fontWeight: 900, 
+                                style={{
+                                    flex: 2,
+                                    padding: '18px',
+                                    background: isSummarizing ? '#475569' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '20px',
+                                    fontWeight: 900,
                                     cursor: isSummarizing ? 'not-allowed' : 'pointer',
                                     boxShadow: '0 10px 20px rgba(16, 185, 129, 0.2)'
                                 }}
@@ -3567,18 +3825,18 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                         </div>
 
                         <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '14px', padding: '6px', marginBottom: '24px' }}>
-                            <button 
+                            <button
                                 onClick={() => setIsUploadMode(false)}
                                 style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: !isUploadMode ? '#10b981' : 'transparent', color: 'white', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
                             >Texto Escrito</button>
-                            <button 
+                            <button
                                 onClick={() => setIsUploadMode(true)}
                                 style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: isUploadMode ? '#10b981' : 'transparent', color: 'white', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
                             >Upload de Arquivo</button>
                         </div>
 
                         {isUploadMode ? (
-                            <div style={{ 
+                            <div style={{
                                 border: '2px dashed rgba(255,255,255,0.1)', borderRadius: '16px', padding: '40px', textAlign: 'center',
                                 background: 'rgba(255,255,255,0.02)', cursor: 'pointer'
                             }} onClick={() => document.getElementById('json-file-input').click()}>
@@ -3591,7 +3849,7 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                                 value={jsonBatchInput}
                                 onChange={e => setJsonBatchInput(e.target.value)}
                                 placeholder='{ "data": [ { "context": "...", "metadata": ["cat1"], "generate_questions": true } ] }'
-                                style={{ 
+                                style={{
                                     width: '100%', height: '250px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)',
                                     borderRadius: '16px', padding: '16px', color: 'white', fontFamily: 'monospace', outline: 'none', resize: 'none'
                                 }}
@@ -3599,14 +3857,14 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                         )}
 
                         <div style={{ display: 'flex', gap: '16px', marginTop: '32px' }}>
-                            <button 
+                            <button
                                 onClick={() => setIsJsonBatchModalOpen(false)}
                                 style={{ flex: 1, padding: '16px', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none', borderRadius: '16px', fontWeight: 700, cursor: 'pointer' }}
                             >Cancelar</button>
-                            <button 
+                            <button
                                 onClick={handleJsonBatchSubmit}
                                 disabled={!jsonBatchInput.trim()}
-                                style={{ 
+                                style={{
                                     flex: 2, padding: '16px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                                     color: 'white', border: 'none', borderRadius: '16px', fontWeight: 900, cursor: 'pointer',
                                     boxShadow: '0 10px 25px rgba(16, 185, 129, 0.4)', opacity: !jsonBatchInput.trim() ? 0.5 : 1
@@ -3643,11 +3901,11 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                                     <h4 style={{ color: 'white', margin: 0, fontSize: '1rem', fontWeight: 800 }}>Configurações Globais</h4>
                                     <p style={{ color: '#94a3b8', margin: '4px 0 0 0', fontSize: '0.8rem' }}>Aplicar as mesmas regras para todos os itens.</p>
                                 </div>
-                                <button 
+                                <button
                                     onClick={() => setIsGlobalConfigEnabled(!isGlobalConfigEnabled)}
-                                    style={{ 
-                                        padding: '10px 20px', borderRadius: '12px', border: 'none', 
-                                        background: isGlobalConfigEnabled ? '#6366f1' : 'rgba(255,255,255,0.05)', 
+                                    style={{
+                                        padding: '10px 20px', borderRadius: '12px', border: 'none',
+                                        background: isGlobalConfigEnabled ? '#6366f1' : 'rgba(255,255,255,0.05)',
                                         color: 'white', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s'
                                     }}
                                 >{isGlobalConfigEnabled ? 'Ativado' : 'Ativar'}</button>
@@ -3657,15 +3915,15 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                                 <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '20px' }}>
                                     {/* Simplified RAG Config UI */}
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                                        <div onClick={() => setRagConfig(p => ({...p, extractQA: !p.extractQA}))} style={{ flex: '1 1 140px', padding: '12px', borderRadius: '12px', background: ragConfig.extractQA ? 'rgba(16, 185, 129, 0.15)' : 'rgba(0,0,0,0.2)', border: `1px solid ${ragConfig.extractQA ? '#10b981' : 'transparent'}`, cursor: 'pointer', textAlign: 'center' }}>
+                                        <div onClick={() => setRagConfig(p => ({ ...p, extractQA: !p.extractQA }))} style={{ flex: '1 1 140px', padding: '12px', borderRadius: '12px', background: ragConfig.extractQA ? 'rgba(16, 185, 129, 0.15)' : 'rgba(0,0,0,0.2)', border: `1px solid ${ragConfig.extractQA ? '#10b981' : 'transparent'}`, cursor: 'pointer', textAlign: 'center' }}>
                                             <div style={{ fontSize: '1.2rem' }}>❓</div>
                                             <div style={{ color: 'white', fontSize: '0.75rem', fontWeight: 800, marginTop: '4px' }}>Perguntas</div>
                                         </div>
-                                        <div onClick={() => setRagConfig(p => ({...p, generateSummary: !p.generateSummary}))} style={{ flex: '1 1 140px', padding: '12px', borderRadius: '12px', background: ragConfig.generateSummary ? 'rgba(59, 130, 246, 0.15)' : 'rgba(0,0,0,0.2)', border: `1px solid ${ragConfig.generateSummary ? '#3b82f6' : 'transparent'}`, cursor: 'pointer', textAlign: 'center' }}>
+                                        <div onClick={() => setRagConfig(p => ({ ...p, generateSummary: !p.generateSummary }))} style={{ flex: '1 1 140px', padding: '12px', borderRadius: '12px', background: ragConfig.generateSummary ? 'rgba(59, 130, 246, 0.15)' : 'rgba(0,0,0,0.2)', border: `1px solid ${ragConfig.generateSummary ? '#3b82f6' : 'transparent'}`, cursor: 'pointer', textAlign: 'center' }}>
                                             <div style={{ fontSize: '1.2rem' }}>📄</div>
                                             <div style={{ color: 'white', fontSize: '0.75rem', fontWeight: 800, marginTop: '4px' }}>Resumo IA</div>
                                         </div>
-                                        <div onClick={() => setRagConfig(p => ({...p, extractChunks: !p.extractChunks}))} style={{ flex: '1 1 140px', padding: '12px', borderRadius: '12px', background: ragConfig.extractChunks ? 'rgba(79, 70, 229, 0.15)' : 'rgba(0,0,0,0.2)', border: `1px solid ${ragConfig.extractChunks ? '#6366f1' : 'transparent'}`, cursor: 'pointer', textAlign: 'center' }}>
+                                        <div onClick={() => setRagConfig(p => ({ ...p, extractChunks: !p.extractChunks }))} style={{ flex: '1 1 140px', padding: '12px', borderRadius: '12px', background: ragConfig.extractChunks ? 'rgba(79, 70, 229, 0.15)' : 'rgba(0,0,0,0.2)', border: `1px solid ${ragConfig.extractChunks ? '#6366f1' : 'transparent'}`, cursor: 'pointer', textAlign: 'center' }}>
                                             <div style={{ fontSize: '1.2rem' }}>🧩</div>
                                             <div style={{ color: 'white', fontSize: '0.75rem', fontWeight: 800, marginTop: '4px' }}>Chunks</div>
                                         </div>
@@ -3674,11 +3932,11 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                                         <div style={{ marginTop: '10px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                                             <div>
                                                 <label style={{ color: '#94a3b8', fontSize: '0.65rem', fontWeight: 800 }}>TAMANHO (CHARS)</label>
-                                                <input type="number" value={ragConfig.chunkSize} onChange={e => setRagConfig(p => ({...p, chunkSize: parseInt(e.target.value)}))} style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '8px', color: 'white', marginTop: '4px' }} />
+                                                <input type="number" value={ragConfig.chunkSize} onChange={e => setRagConfig(p => ({ ...p, chunkSize: parseInt(e.target.value) }))} style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '8px', color: 'white', marginTop: '4px' }} />
                                             </div>
                                             <div>
                                                 <label style={{ color: '#94a3b8', fontSize: '0.65rem', fontWeight: 800 }}>OVERLAY</label>
-                                                <input type="number" value={ragConfig.chunkOverlap} onChange={e => setRagConfig(p => ({...p, chunkOverlap: parseInt(e.target.value)}))} style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '8px', color: 'white', marginTop: '4px' }} />
+                                                <input type="number" value={ragConfig.chunkOverlap} onChange={e => setRagConfig(p => ({ ...p, chunkOverlap: parseInt(e.target.value) }))} style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '8px', color: 'white', marginTop: '4px' }} />
                                             </div>
                                         </div>
                                     )}
@@ -3687,14 +3945,14 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                         </div>
 
                         <div style={{ display: 'flex', gap: '16px' }}>
-                            <button 
+                            <button
                                 onClick={() => setShowJsonConfirmModal(false)}
                                 style={{ flex: 1, padding: '16px', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none', borderRadius: '16px', fontWeight: 700, cursor: 'pointer' }}
                             >Voltar</button>
-                            <button 
+                            <button
                                 onClick={handleConfirmJsonBatch}
                                 disabled={isProcessingJsonBatch}
-                                style={{ 
+                                style={{
                                     flex: 2, padding: '16px', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
                                     color: 'white', border: 'none', borderRadius: '16px', fontWeight: 900, cursor: 'pointer',
                                     boxShadow: '0 10px 25px rgba(99, 102, 241, 0.4)',
@@ -3710,6 +3968,158 @@ const KnowledgeBaseManager = ({ knowledgeBase = [], onChange, onAdd, onDelete, o
                                     <>🚀 Processar Todos os Arquivos</>
                                 )}
                             </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+            {isAddDocsModalOpen && document.body && createPortal(
+                <div style={{
+                    position: 'fixed', inset: 0, background: 'rgba(7, 10, 20, 0.8)',
+                    backdropFilter: 'blur(20px)', zIndex: 100005, display: 'flex',
+                    alignItems: 'center', justifyContent: 'center', padding: '20px'
+                }}>
+                    <div className="fade-in" style={{
+                        background: '#0f172a', border: '1px solid rgba(16, 185, 129, 0.3)',
+                        borderRadius: '32px', width: '100%', maxWidth: '500px',
+                        padding: '40px', boxShadow: '0 30px 60px rgba(0,0,0,0.8)'
+                    }}>
+                        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+                            <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📂</div>
+                            <h2 style={{ color: 'white', fontSize: '1.8rem', fontWeight: 900, marginBottom: '8px' }}>Adicionar Documentos</h2>
+                            <p style={{ color: '#94a3b8', fontSize: '1rem' }}>Escolha o método de importação</p>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <button
+                                onClick={() => { setIsAddDocsModalOpen(false); handlePasteText(); }}
+                                style={{ padding: '20px', background: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', fontWeight: 700, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '15px' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                            >
+                                <span style={{ fontSize: '1.5rem' }}>📋</span>
+                                <div>
+                                    <div style={{ fontWeight: 800 }}>Colar Texto</div>
+                                    <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Cole conteúdo manualmente ou de arquivos .txt</div>
+                                </div>
+                            </button>
+
+                            <button
+                                onClick={() => { setIsAddDocsModalOpen(false); handleImportClick(); }}
+                                style={{ padding: '20px', background: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', fontWeight: 700, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '15px' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                            >
+                                <span style={{ fontSize: '1.5rem' }}>📊</span>
+                                <div>
+                                    <div style={{ fontWeight: 800 }}>Importar CSV / Excel</div>
+                                    <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Planilhas estruturadas com dados em lote</div>
+                                </div>
+                            </button>
+
+                            <button
+                                onClick={() => { setIsAddDocsModalOpen(false); fileInputRef.current.click(); }}
+                                style={{ padding: '20px', background: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', fontWeight: 700, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '15px' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                            >
+                                <span style={{ fontSize: '1.5rem' }}>📄</span>
+                                <div>
+                                    <div style={{ fontWeight: 800 }}>Upload PDF/DOCX</div>
+                                    <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Arquivos de documentos para extração de RAG</div>
+                                </div>
+                            </button>
+                        </div>
+
+                        <button
+                            onClick={() => setIsAddDocsModalOpen(false)}
+                            style={{ width: '100%', marginTop: '32px', padding: '16px', background: 'transparent', color: '#94a3b8', border: 'none', borderRadius: '16px', fontWeight: 700, cursor: 'pointer' }}
+                        >Cancelar</button>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {isAddNewModalOpen && document.body && createPortal(
+                <div style={{
+                    position: 'fixed', inset: 0, background: 'rgba(7, 10, 20, 0.9)',
+                    backdropFilter: 'blur(20px)', zIndex: 100005, display: 'flex',
+                    alignItems: 'center', justifyContent: 'center', padding: '20px'
+                }}>
+                    <div className="fade-in" style={{
+                        background: '#0f172a', border: '1px solid rgba(99, 102, 241, 0.3)',
+                        borderRadius: '32px', width: '100%', maxWidth: '800px',
+                        padding: '40px', boxShadow: '0 30px 60px rgba(0,0,0,0.8)',
+                        maxHeight: '90vh', overflowY: 'auto'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <div style={{ width: '8px', height: '24px', background: 'var(--accent-gradient)', borderRadius: '4px' }}></div>
+                                <h4 style={{ color: 'white', fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>Novo Conhecimento</h4>
+                            </div>
+                            <button
+                                onClick={() => setIsAddNewModalOpen(false)}
+                                style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#94a3b8', width: '32px', height: '32px', borderRadius: '8px', cursor: 'pointer' }}
+                            >✕</button>
+                        </div>
+
+                        <div className="form-row-kb">
+                            <div className="form-group flex-2">
+                                <ExpandableField
+                                    label={kbLabels.question}
+                                    placeholder={`Ex: ${kbLabels.question === 'Pergunta' ? 'Qual o horário de funcionamento?' : 'Digite aqui...'}`}
+                                    value={newPair.question}
+                                    onChange={(e) => setNewPair({ ...newPair, question: e.target.value })}
+                                />
+                            </div>
+                            <div className="form-group flex-2">
+                                <ExpandableField
+                                    label={kbLabels.metadata}
+                                    placeholder={`Ex: ${kbLabels.metadata === 'Metadado' ? 'PAINEL INICIAL | Chat' : 'Digite aqui...'}`}
+                                    value={newPair.metadata_val}
+                                    onChange={(e) => setNewPair({ ...newPair, metadata_val: e.target.value })}
+                                />
+                            </div>
+                            <div className="form-group flex-1">
+                                <label>Categoria</label>
+                                <input
+                                    type="text"
+                                    value={newPair.category}
+                                    onChange={e => setNewPair({ ...newPair, category: e.target.value })}
+                                    placeholder="Geral, Preços, etc."
+                                    style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '12px', color: 'white' }}
+                                />
+                            </div>
+                        </div>
+                        <div className="form-group" style={{ marginTop: '1.5rem' }}>
+                            <ExpandableField
+                                label={kbLabels.answer}
+                                type="textarea"
+                                placeholder={`Ex: ${kbLabels.answer === 'Resposta' ? 'O horário é...' : 'Digite o conteúdo...'}`}
+                                value={newPair.answer}
+                                onChange={(e) => setNewPair({ ...newPair, answer: e.target.value })}
+                                style={{ minHeight: '200px' }}
+                            />
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '16px', marginTop: '32px' }}>
+                            <button
+                                onClick={() => setIsAddNewModalOpen(false)}
+                                style={{ flex: 1, padding: '18px', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none', borderRadius: '16px', fontWeight: 700, cursor: 'pointer' }}
+                            >Cancelar</button>
+                            <button
+                                onClick={() => {
+                                    handleAddItem();
+                                    setIsAddNewModalOpen(false);
+                                }}
+                                disabled={!newPair.question.trim() || !newPair.answer.trim()}
+                                style={{
+                                    flex: 2, padding: '18px', background: 'var(--accent-gradient)',
+                                    color: 'white', border: 'none', borderRadius: '16px', fontWeight: 900, cursor: 'pointer',
+                                    boxShadow: '0 10px 25px rgba(99, 102, 241, 0.4)',
+                                    opacity: (!newPair.question.trim() || !newPair.answer.trim()) ? 0.5 : 1
+                                }}
+                            >✨ Adicionar à Base</button>
                         </div>
                     </div>
                 </div>,

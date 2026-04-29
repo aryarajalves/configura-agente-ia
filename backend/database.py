@@ -47,7 +47,8 @@ engine = create_async_engine(
     pool_size=20,          # Mais conex├Áes simultâneas permitidas
     max_overflow=10,       # Capacidade extra para picos de tráfego
     pool_timeout=30,       # Tempo de espera por uma conexão
-    pool_recycle=1800      # Reciclar conex├Áes a cada 30 min para saúde do banco
+    pool_recycle=1800,     # Reciclar conexões a cada 30 min para saúde do banco
+    pool_pre_ping=True     # Verifica se a conexão está viva antes de usar
 )
 
 async_session = async_sessionmaker(
