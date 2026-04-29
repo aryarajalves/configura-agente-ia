@@ -6,10 +6,11 @@ export PATH="/usr/local/bin:$PATH"
 
 echo "⏳ Aguardando o banco de dados ficar disponível..."
 
-# Extrai host e porta da DATABASE_URL (formato: postgresql+asyncpg://user:pass@host:port/db)
+# Extração robusta
 DB_HOST=$(echo "$DATABASE_URL" | sed -E 's|.*@([^:/]+).*|\1|')
-DB_PORT=$(echo "$DATABASE_URL" | sed -E 's|.*:([0-9]+)/.*|\1|')
-DB_PORT=${DB_PORT:-5432}
+DB_PORT=$(echo "$DATABASE_URL" | grep -qE ":[0-9]+/" && echo "$DATABASE_URL" | sed -E 's|.*:([0-9]+)/.*|\1|' || echo "5432")
+
+echo "🔍 Tentando conectar em HOST: $DB_HOST | PORTA: $DB_PORT"
 
 until pg_isready -h "$DB_HOST" -p "$DB_PORT" -q; do
   echo "   Banco não disponível ainda, tentando novamente em 2s..."

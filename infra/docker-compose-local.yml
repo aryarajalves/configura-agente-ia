@@ -70,7 +70,7 @@ services:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-admin_agente}:${POSTGRES_PASSWORD:-admin_agente_pwd_123}@postgres:5432/${POSTGRES_DB:-rag_db}
       - RABBITMQ_URL=amqp://${RABBITMQ_DEFAULT_USER:-guest}:${RABBITMQ_DEFAULT_PASS:-guest}@rabbitmq:5672/
       - PYTHONUNBUFFERED=1
-    command: [ "sh", "/app/entrypoint.sh", "worker" ]
+    command: [ "worker" ]
     depends_on:
       rabbitmq:
         condition: service_healthy

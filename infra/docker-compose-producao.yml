@@ -27,13 +27,13 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - GUNICORN_WORKERS=4
       - GUNICORN_TIMEOUT=3600
-      - FRONTEND_URL=https://agentefrontlucas.agency10x.com.br
+      - FRONTEND_URL=https://agentevetmanager.cleverdev.cloud
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ASSEMBLYAI_API_KEY=${ASSEMBLYAI_API_KEY}
       - AGENT_API_KEY=${AGENT_API_KEY}
       - ADMIN_EMAIL=${ADMIN_EMAIL}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - CORS_ALLOWED_ORIGINS=https://agentefrontlucas.agency10x.com.br
+      - CORS_ALLOWED_ORIGINS=https://agentevetmanager.cleverdev.cloud
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
       - S3_ENABLED=True
@@ -55,14 +55,15 @@ services:
           memory: 4096M
       labels:
         - traefik.enable=true
-        - traefik.http.routers.agentes_backend.rule=Host(`agentebacklucas.agency10x.com.br`)
-        - traefik.http.routers.agentes_backend.entrypoints=websecure
-        - traefik.http.routers.agentes_backend.tls.certresolver=letsencryptresolver
-        - traefik.http.routers.agentes_backend.service=agentes_backend
-        - traefik.http.services.agentes_backend.loadbalancer.server.port=8000
-        - traefik.http.services.agentes_backend.loadbalancer.passhostheader=true
-        - traefik.http.middlewares.sslheader.headers.customrequestheaders.X-Forwarded-Proto=https
-        - traefik.http.routers.agentes_backend.middlewares=sslheader@docker
+        - traefik.docker.network=network_swarm_public
+        - traefik.http.routers.vet-back-v1.rule=Host(`backagentevetmanager.cleverdev.cloud`)
+        - traefik.http.routers.vet-back-v1.entrypoints=websecure
+        - traefik.http.routers.vet-back-v1.tls=true
+        - traefik.http.routers.vet-back-v1.tls.certresolver=letsencryptresolver
+        - traefik.http.services.vet-back-v1-svc.loadbalancer.server.port=8000
+        - traefik.http.services.vet-back-v1-svc.loadbalancer.passhostheader=true
+        - traefik.http.middlewares.vet-back-header.headers.customrequestheaders.X-Forwarded-Proto=https
+        - traefik.http.routers.vet-back-v1.middlewares=vet-back-header
 
   worker:
     image: ${IMAGE_BASE}-backend
@@ -71,13 +72,13 @@ services:
       - network_swarm_public
     environment:
       - DATABASE_URL=${DATABASE_URL}
-      - FRONTEND_URL=https://agentefrontlucas.agency10x.com.br
+      - FRONTEND_URL=https://agentevetmanager.cleverdev.cloud
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ASSEMBLYAI_API_KEY=${ASSEMBLYAI_API_KEY}
       - AGENT_API_KEY=${AGENT_API_KEY}
       - ADMIN_EMAIL=${ADMIN_EMAIL}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - CORS_ALLOWED_ORIGINS=https://agentefrontlucas.agency10x.com.br
+      - CORS_ALLOWED_ORIGINS=https://agentevetmanager.cleverdev.cloud
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
       - S3_ENABLED=True
@@ -118,14 +119,15 @@ services:
           memory: 512M
       labels:
         - traefik.enable=true
-        - traefik.http.routers.agentes_frontend.rule=Host(`agentefrontlucas.agency10x.com.br`)
-        - traefik.http.routers.agentes_frontend.entrypoints=websecure
-        - traefik.http.routers.agentes_frontend.tls.certresolver=letsencryptresolver
-        - traefik.http.routers.agentes_frontend.service=agentes_frontend
-        - traefik.http.services.agentes_frontend.loadbalancer.server.port=80
-        - traefik.http.services.agentes_frontend.loadbalancer.passhostheader=true
-        - traefik.http.middlewares.sslheader.headers.customrequestheaders.X-Forwarded-Proto=https
-        - traefik.http.routers.agentes_frontend.middlewares=sslheader@docker
+        - traefik.docker.network=network_swarm_public
+        - traefik.http.routers.vet-front-v1.rule=Host(`agentevetmanager.cleverdev.cloud`)
+        - traefik.http.routers.vet-front-v1.entrypoints=websecure
+        - traefik.http.routers.vet-front-v1.tls=true
+        - traefik.http.routers.vet-front-v1.tls.certresolver=letsencryptresolver
+        - traefik.http.services.vet-front-v1-svc.loadbalancer.server.port=80
+        - traefik.http.services.vet-front-v1-svc.loadbalancer.passhostheader=true
+        - traefik.http.middlewares.vet-front-header.headers.customrequestheaders.X-Forwarded-Proto=https
+        - traefik.http.routers.vet-front-v1.middlewares=vet-front-header
 
 networks:
   network_swarm_public:
