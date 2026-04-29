@@ -27,8 +27,7 @@ const Login = ({ onLogin }) => {
                 setError(data.detail || 'Email ou senha inválidos');
             }
         } catch (err) {
-            console.error('Login error:', err);
-            setError(`Erro de conexão: ${err.message}. Verifique se o backend em http://localhost:8000 está rodando.`);
+            setError('Erro de conexão com o servidor');
         } finally {
             setLoading(false);
         }

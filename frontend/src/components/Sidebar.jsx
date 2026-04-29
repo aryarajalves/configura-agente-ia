@@ -10,8 +10,8 @@ const Sidebar = ({ onLogout }) => {
     const [status, setStatus] = useState({ type: '', message: '' });
 
     const userRole = localStorage.getItem('user_role') || 'Usuário';
-    const isSuperAdmin = userRole === 'SUPERADMIN';
-    const isAdmin = userRole === 'ADMIN';
+    const isSuperAdmin = userRole === 'Super Admin';
+    const isAdmin = userRole === 'Admin';
     const isUser = userRole === 'Usuário';
 
     const fetchUserData = async () => {
@@ -23,8 +23,7 @@ const Sidebar = ({ onLogout }) => {
                 }
             });
             if (response.ok) {
-                const resJson = await response.json();
-                const data = resJson.data || resJson; // Fallback for direct responses
+                const data = await response.json();
                 setUserData({ name: data.name || '', email: data.email || '', password: '' });
             }
         } catch (error) {
@@ -47,8 +46,7 @@ const Sidebar = ({ onLogout }) => {
                 body: JSON.stringify(userData)
             });
             if (response.ok) {
-                const resJson = await response.json();
-                const updated = resJson.data || resJson;
+                const updated = await response.json();
                 if (updated && updated.name) {
                     localStorage.setItem('user_name', updated.name);
                 }
@@ -142,14 +140,6 @@ const Sidebar = ({ onLogout }) => {
                                     >
                                         <span className="nav-icon">🔌</span>
                                         <span className="nav-label">Integrações</span>
-                                        <div className="active-indicator"></div>
-                                    </NavLink>
-                                    <NavLink
-                                        to="/fine-tuning"
-                                        className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                                    >
-                                        <span className="nav-icon">🎛️</span>
-                                        <span className="nav-label">Fine-Tuning</span>
                                         <div className="active-indicator"></div>
                                     </NavLink>
                                 </>

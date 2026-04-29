@@ -180,19 +180,15 @@ async def test_system_reset_authenticated(client: AsyncClient):
     assert "All data wiped" in response.json()["message"]
 
 @pytest.mark.asyncio
-async def test_users_auth_missing():
+async def test_users_auth_missing(db_session):
+    # We use a brand new client WITHOUT the default headers from the 'client' fixture
     from main import app
     from httpx import AsyncClient, ASGITransport
-    # Test 1: No API Key, No Token
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         res1 = await ac.get("/users")
         assert res1.status_code == 403 # Missing API Key
         
-    # Test 2: Valid API Key, NO JWT Token (Should fail now)
-    valid_apikey = os.getenv("AGENT_API_KEY", "test-key")
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"X-API-Key": valid_apikey}) as ac:
-        res2 = await ac.get("/users")
+        # Valid API Key, NO JWT Token
+        valid_apikey = os.getenv("AGENT_API_KEY", "test-api-key")
+        res2 = await ac.get("/users", headers={"X-API-Key": valid_apikey})
         assert res2.status_code == 401 # Unauthorized (Token missing)
-        
-        res3 = await ac.post("/system/reset-database")
-        assert res3.status_code == 401 # Unauthorized

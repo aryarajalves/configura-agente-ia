@@ -24,7 +24,7 @@ const UserManagement = () => {
     });
 
     const userRole = localStorage.getItem('user_role') || 'Usuário';
-    const isSuperAdmin = userRole === 'SUPERADMIN';
+    const isSuperAdmin = userRole === 'Super Admin';
 
     useEffect(() => {
         fetchUsers();
@@ -52,19 +52,10 @@ const UserManagement = () => {
         try {
             setLoading(true);
             const response = await api.get('/users');
-            const data = await response.json().catch(() => null);
-
-            // Null-safe: API may return SuccessResponse {data: [...]} or a direct array
-            let users = [];
-            if (Array.isArray(data)) {
-                users = data;
-            } else if (data && Array.isArray(data.data)) {
-                users = data.data;
-            }
-            setUsers(users);
+            const data = await response.json();
+            setUsers(data);
         } catch (error) {
             console.error("Erro ao buscar usuários:", error);
-            setUsers([]);
         } finally {
             setLoading(false);
         }
@@ -129,7 +120,7 @@ const UserManagement = () => {
         }
     };
 
-    const filteredUsers = (users || []).filter(user => {
+    const filteredUsers = users.filter(user => {
         const matchesSearch = (user.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
             (user.email || '').toLowerCase().includes(searchTerm.toLowerCase());
         const matchesRole = roleFilter === 'all' || user.role === roleFilter;
@@ -172,9 +163,9 @@ const UserManagement = () => {
                     className="role-select"
                 >
                     <option value="all">Todos os Cargos</option>
-                    <option value="SUPERADMIN">Super Admin</option>
-                    <option value="ADMIN">Admin</option>
-                    <option value="USER">Usuário</option>
+                    <option value="Super Admin">Super Admin</option>
+                    <option value="Admin">Admin</option>
+                    <option value="Usuário">Usuário</option>
                 </select>
             </div>
 
@@ -309,8 +300,8 @@ const UserManagement = () => {
                                         value={formData.role}
                                         onChange={e => setFormData({ ...formData, role: e.target.value })}
                                     >
-                                        <option value="USER">Usuário (Acesso Limitado)</option>
-                                        <option value="ADMIN">Admin (Controle Total)</option>
+                                        <option value="Usuário">Usuário (Acesso Limitado)</option>
+                                        <option value="Admin">Admin (Controle Total)</option>
                                     </select>
                                 </div>
                                 <div className="form-group half">

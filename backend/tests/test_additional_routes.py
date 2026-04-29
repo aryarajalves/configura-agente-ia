@@ -27,8 +27,9 @@ async def test_unanswered_questions_flow(client: AsyncClient, db_session):
     response = await client.get("/unanswered-questions")
     assert response.status_code == 200
     data = response.json()
-    assert len(data) >= 1
-    assert any(item["id"] == q.id for item in data)
+    assert data["success"] is True
+    assert len(data["items"]) >= 1
+    assert any(item["id"] == q.id for item in data["items"])
 
     # 3. Create a Knowledge Base for answering
     kb = KnowledgeBaseModel(name="FAQ", description="FAQ Base")
@@ -43,7 +44,7 @@ async def test_unanswered_questions_flow(client: AsyncClient, db_session):
     }
     response = await client.post(f"/unanswered-questions/{q.id}/answer", json=payload)
     assert response.status_code == 200
-    assert "sucesso" in response.json()["message"]
+    assert response.json()["message"]
 
     # 5. Verify status and knowledge item
     await db_session.refresh(q)

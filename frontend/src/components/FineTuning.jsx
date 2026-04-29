@@ -374,7 +374,7 @@ const FineTuning = () => {
     useEffect(() => {
         if (activeTab !== 'jobs') return;
         const PENDING_STATUSES = ['validating_files', 'queued', 'running'];
-        const hasPending = (jobs || []).some(j => PENDING_STATUSES.includes(j.status));
+        const hasPending = jobs.some(j => PENDING_STATUSES.includes(j.status));
         if (!hasPending) return;
         const interval = setInterval(() => {
             loadJobs();
@@ -432,11 +432,11 @@ const FineTuning = () => {
         }
     };
 
-    const totalExamples = (feedbackList || []).length;
-    const pendingExamples = (feedbackList || []).filter(f => !f.exported_to_finetune && f.corrected_response).length;
-    const positiveCount = (feedbackList || []).filter(f => f.rating === 'positive').length;
-    const negativeCount = (feedbackList || []).filter(f => f.rating === 'negative').length;
-    const withCorrectionCount = (feedbackList || []).filter(f => f.corrected_response).length;
+    const totalExamples = feedbackList.length;
+    const pendingExamples = feedbackList.filter(f => !f.exported_to_finetune && f.corrected_response).length;
+    const positiveCount = feedbackList.filter(f => f.rating === 'positive').length;
+    const negativeCount = feedbackList.filter(f => f.rating === 'negative').length;
+    const withCorrectionCount = feedbackList.filter(f => f.corrected_response).length;
 
     if (agentsLoaded && agents.length === 0) {
         return (
@@ -634,7 +634,7 @@ const FineTuning = () => {
                         value={selectedAgentId || ''}
                         onChange={e => setSelectedAgentId(Number(e.target.value))}
                     >
-                        {(agents || []).map(a => (
+                        {agents.map(a => (
                             <option key={a.id} value={a.id}>{a.name}</option>
                         ))}
                     </select>
@@ -754,7 +754,7 @@ const FineTuning = () => {
                             </div>
                         ) : (
                             <div className="ft-dataset-list">
-                                {(feedbackList || []).map(item => (
+                                {feedbackList.map(item => (
                                     <FeedbackItem
                                         key={item.id}
                                         item={item}

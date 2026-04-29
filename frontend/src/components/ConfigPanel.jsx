@@ -208,33 +208,30 @@ const ConfigPanel = () => {
 
     useEffect(() => {
         const loadData = async () => {
+            setIsLoadingData(true);
             try {
+                // Models (Critical)
                 try {
                     const modelsRes = await api.get('/models');
                     const modelsData = await modelsRes.json();
-
-                    // Handle SuccessResponse wrapper
-                    const baseModels = Array.isArray(modelsData) 
-                        ? modelsData 
-                        : (Array.isArray(modelsData?.data) ? modelsData.data : (modelsData?.models || []));
 
                     // Fine-tuning models são opcionais - não devem bloquear o fluxo
                     let ftModelsData = [];
                     try {
                         const ftModelsRes = await api.get('/fine-tuning/models');
                         if (ftModelsRes.ok) {
-                            const ftResponse = await ftModelsRes.json();
-                            ftModelsData = Array.isArray(ftResponse) ? ftResponse : (ftResponse?.data || []);
+                            ftModelsData = await ftModelsRes.json();
                         }
                     } catch (ftErr) {
                         console.warn("Fine-tuning models unavailable:", ftErr);
                     }
 
+                    const baseModels = modelsData?.models || [];
                     // Converte modelos fine-tuned para o formato esperado pelo seletor
-                    const ftModels = ftModelsData.map(m => ({
+                    const ftModels = (Array.isArray(ftModelsData) ? ftModelsData : []).map(m => ({
                         id: m.id,
                         name: `Fine-Tuning: ${m.id.split(':').slice(-1)[0]}`,
-                        supports_tools: true,
+                        supports_tools: true, // Fine-tuned versions of 4o-mini support tools
                         supports_temperature: true,
                         is_finetuned: true
                     }));
@@ -250,22 +247,27 @@ const ConfigPanel = () => {
                     }
                 } catch (err) {
                     console.error("Error fetching models, using fallback:", err);
+                    // Fallback list
                     setModels([
+                        { id: "gpt-5.4", supports_tools: true, supports_temperature: true, input: 0.0000025, output: 0.000015, context_window: "1.05M", provider: "openai" },
+                        { id: "gpt-5.2", supports_tools: true, supports_temperature: true, input: 0.00000175, output: 0.000014, context_window: "128k", provider: "openai" },
+                        { id: "gpt-5-mini", supports_tools: true, supports_temperature: true, input: 0.0000003, output: 0.0000021, context_window: "128k", provider: "openai" },
+                        { id: "gpt-5", supports_tools: true, supports_temperature: true, input: 0.0000015, output: 0.000012, context_window: "128k", provider: "openai" },
+                        { id: "gpt-4.1", supports_tools: true, supports_temperature: true, input: 0.000001, output: 0.000008, context_window: "128k", provider: "openai" },
                         { id: "gpt-4o-mini", supports_tools: true, supports_temperature: true, input: 0.00000015, output: 0.0000006, context_window: "128k", provider: "openai" },
                         { id: "gpt-4o", supports_tools: true, supports_temperature: true, input: 0.0000025, output: 0.00001, context_window: "128k", provider: "openai" },
+                        { id: "gemini-3.1-pro", supports_tools: true, supports_temperature: true, input: 0.000002, output: 0.000012, context_window: "2M", provider: "gemini" },
+                        { id: "gemini-3.1-flash", supports_tools: true, supports_temperature: true, input: 0.0000005, output: 0.000003, context_window: "1M", provider: "gemini" },
+                        { id: "gemini-2.5-pro", supports_tools: true, supports_temperature: true, input: 0.00000125, output: 0.00001, context_window: "2M", provider: "gemini" },
+                        { id: "gemini-2.5-flash", supports_tools: true, supports_temperature: true, input: 0.0000003, output: 0.0000025, context_window: "1M", provider: "gemini" },
                     ]);
                 }
 
-                // Knowledge Bases (Handled correctly before, but keeping consistency)
+                // Knowledge Bases
                 try {
                     const kbsRes = await api.get('/knowledge-bases');
-                    const kbsData = await kbsRes.json().catch(() => null);
-                    const kbArray = Array.isArray(kbsData)
-                        ? kbsData
-                        : Array.isArray(kbsData?.data)
-                        ? kbsData.data
-                        : [];
-                    setKbList(kbArray);
+                    const kbsData = await kbsRes.json();
+                    setKbList(kbsData || []);
                 } catch (err) {
                     console.error("Error fetching KBs:", err);
                     setKbList([]);
@@ -275,15 +277,11 @@ const ConfigPanel = () => {
                 try {
                     const toolsRes = await api.get('/tools');
                     const toolsData = await toolsRes.json();
-                    const finalTools = Array.isArray(toolsData) 
-                        ? toolsData 
-                        : (Array.isArray(toolsData?.data) ? toolsData.data : []);
-                    setToolsList(finalTools);
+                    setToolsList(Array.isArray(toolsData) ? toolsData : []);
                 } catch (err) {
                     console.error("Error fetching Tools:", err);
                     setToolsList([]);
                 }
-
 
                 // App Integrations status
                 try {
