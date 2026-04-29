@@ -18,22 +18,33 @@ done
 
 echo "✅ Banco de dados disponível."
 
-# Skip migrations if running as a worker (to avoid concurrent race conditions)
-if [ "$1" != "worker" ]; then
-    echo "🛠️ Inicializando tabelas do banco de dados..."
-    python init_db.py
-    
-    echo "🔄 Rodando migrações (alembic upgrade head)..."
-    python -c "from alembic.config import main; main(argv=['upgrade', 'head'])" || echo "⚠️ Alembic falhou (provavelmente banco vazio sem histórico), continuando..."
-    echo "✅ Inicialização concluída."
-else
+# ---- Roteamento de comandos ----
+case "$1" in
+  worker)
     echo "⏭️ Pulando migrações (Serviço Worker Identificado)..."
-fi
+    echo "🚀 Iniciando TaskIQ Worker..."
+    exec python -m taskiq worker broker:broker tasks
+    ;;
+  scheduler)
+    echo "⏭️ Pulando migrações (Serviço Scheduler Identificado)..."
+    echo "🚀 Iniciando TaskIQ Scheduler..."
+    exec python -m taskiq scheduler broker:scheduler
+    ;;
+  *)
+    # Serviço principal (backend / API)
+    echo "🛠️ Verificando/Criando banco de dados se necessário..."
+    python -c "import asyncio; import models; from database import init_db; asyncio.run(init_db())"
 
-if [ $# -gt 0 ]; then
-    echo "🚀 Executando comando recebido: $@"
-    exec "$@"
-else
-    echo "🚀 Iniciando aplicação web..."
-    exec python -m gunicorn src.main:app -w "${GUNICORN_WORKERS:-4}" -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --timeout "${GUNICORN_TIMEOUT:-3600}" --access-logfile -
-fi
+    echo "🔄 Rodando migrações (alembic upgrade head)..."
+    python -c "from alembic.config import main; main(argv=['upgrade', 'head'])"
+    echo "✅ Migrações concluídas."
+
+    if [ $# -gt 0 ]; then
+        echo "🚀 Executando comando recebido: $@"
+        exec "$@"
+    else
+        echo "🚀 Iniciando aplicação web..."
+        exec python -m gunicorn main:app -w "${GUNICORN_WORKERS:-4}" -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --timeout "${GUNICORN_TIMEOUT:-120}"
+    fi
+    ;;
+esac

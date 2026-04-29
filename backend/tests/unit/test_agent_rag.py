@@ -4,7 +4,7 @@ import asyncio
 import json
 
 async def test_agent():
-    url = "http://localhost:8000/execute"
+    url = "http://localhost:8002/execute"
     payload = {
         "message": "Me fale sobre os preços e valores dos seus serviços de mentoria ou consultas disponíveis na base de conhecimento.",
         "agent_id": 1,
@@ -15,7 +15,7 @@ async def test_agent():
         }
     }
     headers = {
-        "X-API-Key": "a0c10"
+        "X-API-Key": "a0c10372-af47-4a36-932a-9b1acdb59366"
     }
     
     print(f"Enviando mensagem: {payload['message']}")

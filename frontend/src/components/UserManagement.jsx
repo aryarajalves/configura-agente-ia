@@ -24,7 +24,7 @@ const UserManagement = () => {
     });
 
     const userRole = localStorage.getItem('user_role') || 'Usuário';
-    const isSuperAdmin = userRole === 'SUPERADMIN';
+    const isSuperAdmin = userRole === 'Super Admin';
 
     useEffect(() => {
         fetchUsers();
@@ -163,9 +163,9 @@ const UserManagement = () => {
                     className="role-select"
                 >
                     <option value="all">Todos os Cargos</option>
-                    <option value="SUPERADMIN">Super Admin</option>
-                    <option value="ADMIN">Admin</option>
-                    <option value="USER">Usuário</option>
+                    <option value="Super Admin">Super Admin</option>
+                    <option value="Admin">Admin</option>
+                    <option value="Usuário">Usuário</option>
                 </select>
             </div>
 
@@ -300,8 +300,8 @@ const UserManagement = () => {
                                         value={formData.role}
                                         onChange={e => setFormData({ ...formData, role: e.target.value })}
                                     >
-                                        <option value="USER">Usuário (Acesso Limitado)</option>
-                                        <option value="ADMIN">Admin (Controle Total)</option>
+                                        <option value="Usuário">Usuário (Acesso Limitado)</option>
+                                        <option value="Admin">Admin (Controle Total)</option>
                                     </select>
                                 </div>
                                 <div className="form-group half">

@@ -28,8 +28,8 @@ replace_env_vars() {
         if [ -n "$VITE_API_URL" ]; then
             # Remove barra final se houver
             CLEAN_URL=$(echo $VITE_API_URL | sed 's|/*$||')
-            # Busca por localhost:8000 (padrão de build) ou pelo PLACEHOLDER
-            sed -i "s|http://localhost:8000|$CLEAN_URL|g" "$file"
+            # Busca por localhost:8002 (padrão de build) ou pelo PLACEHOLDER
+            sed -i "s|http://localhost:8002|$CLEAN_URL|g" "$file"
             sed -i "s|VITE_API_URL_PLACEHOLDER|$CLEAN_URL|g" "$file"
         fi
 
