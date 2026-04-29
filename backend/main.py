@@ -21,6 +21,7 @@ from smart_importer import extract_text_from_pdf, chunk_text, generate_qa_from_t
 import logging
 import asyncio
 from router_import import router as import_router
+from broker import broker
 from transcription_service import transcribe_video
 from services.s3_service import s3_service
 import tempfile
@@ -105,7 +106,7 @@ async def verify_api_key(api_key: str = Security(_API_KEY_HEADER)):
     if not expected:
         return
     if api_key != expected:
-        logger.warning(f"AUTH: API Key inválida! Recebida: {api_key[:5]}...")
+        logger.warning(f"AUTH: API Key inválida! Recebida: {str(api_key)[:5]}...")
         raise HTTPException(
             status_code=403,
             detail="API Key inválida ou ausente. Envie o header X-API-Key correto."
@@ -114,7 +115,11 @@ async def verify_api_key(api_key: str = Security(_API_KEY_HEADER)):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    if not broker.is_worker_process:
+        await broker.startup()
     yield
+    if not broker.is_worker_process:
+        await broker.shutdown()
 
 app = FastAPI(title="AI Agent API", lifespan=lifespan)
 app.state.limiter = limiter
@@ -1316,10 +1321,10 @@ async def process_media_background_endpoint(
             "original_filename": file.filename
         }
         
-        # Dispara a tarefa
-        task = process_kb_media_task.delay(log.id, kb_id, payload)
+        # Dispara a tarefa via TaskIQ
+        task_result = await process_kb_media_task.kiq(log.id, kb_id, payload)
         
-        log.task_id = task.id
+        log.task_id = task_result.task_id
         log.details["file_path"] = file_path
         db.add(log)
         await db.commit()
@@ -1499,9 +1504,9 @@ async def process_json_batch_endpoint(
                 "options": item_options
             }
             
-            task = process_kb_json_item_task.delay(log.id, kb_id, payload)
+            task_result = await process_kb_json_item_task.kiq(log.id, kb_id, payload)
             
-            log.task_id = task.id
+            log.task_id = task_result.task_id
             logs_started.append(log.id)
             
         await db.commit()
@@ -1512,8 +1517,9 @@ async def process_json_batch_endpoint(
         }
         
     except Exception as e:
-        logger.error(f"Erro ao iniciar processamento de lote JSON: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        logger.error(f"Erro ao iniciar processamento de lote JSON: {repr(e)}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(repr(e)))
 
 @app.post("/knowledge-bases/{kb_id}/import-mapped", dependencies=[Depends(verify_api_key)])
 async def import_mapped_file(

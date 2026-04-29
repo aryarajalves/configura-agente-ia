@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, AsyncMock, patch
 from models import BackgroundProcessLog
 
 @pytest.mark.asyncio
@@ -13,11 +13,10 @@ async def test_list_background_tasks(client):
 @pytest.mark.asyncio
 async def test_start_video_processing(mock_task, client):
     """Testa o início de um processamento de vídeo em background."""
-    # Mock do método .delay() do Celery
-    mock_id = "test-task-123"
-    mock_task_obj = MagicMock()
-    mock_task_obj.id = mock_id
-    mock_task.delay.return_value = mock_task_obj
+    # Mock do método .kiq() do TaskIQ
+    mock_result = MagicMock()
+    mock_result.task_id = "test-task-123"
+    mock_task.kiq = AsyncMock(return_value=mock_result)
     
     payload = {
         "video_path": "test_video.mp4",
@@ -62,10 +61,9 @@ async def test_websocket_connection(client):
 @pytest.mark.asyncio
 async def test_process_json_batch(mock_task, client):
     """Testa o processamento de um lote de itens JSON."""
-    mock_id = "test-json-task-456"
-    mock_task_obj = MagicMock()
-    mock_task_obj.id = mock_id
-    mock_task.delay.return_value = mock_task_obj
+    mock_result = MagicMock()
+    mock_result.task_id = "test-json-task-456"
+    mock_task.kiq = AsyncMock(return_value=mock_result)
     
     payload = [
         {
@@ -89,5 +87,5 @@ async def test_process_json_batch(mock_task, client):
     assert "log_ids" in data
     assert len(data["log_ids"]) == 2
     
-    # Verifica se a task foi chamada 2 vezes
-    assert mock_task.delay.call_count == 2
+    # Verifica se a task foi chamada 2 vezes via .kiq()
+    assert mock_task.kiq.call_count == 2

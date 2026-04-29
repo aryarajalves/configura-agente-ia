@@ -2,97 +2,21 @@ version: '3.8'
 
 services:
 
-  celery_beat:
-    image: ${IMAGE_BASE}-backend
+  rabbitmq:
+    image: rabbitmq:3-management
     hostname: "{{.Service.Name}}.{{.Task.Slot}}"
     networks:
       - network_swarm_public
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - GUNICORN_WORKERS=4
-      - FRONTEND_URL=https://agentefrontlucas.agency10x.com.br
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ASSEMBLYAI_API_KEY=${ASSEMBLYAI_API_KEY}
-      - AGENT_API_KEY=${AGENT_API_KEY}
-      - ADMIN_EMAIL=${ADMIN_EMAIL}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - CORS_ALLOWED_ORIGINS=https://agentefrontlucas.agency10x.com.br
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
-      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
-      - S3_ENABLED=True
-      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
-      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
-      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}
-      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
-      - S3_REGION=${S3_REGION}
-    command: ["celery", "-A", "celery_app", "beat", "--loglevel=info"]
-    deploy:
-      mode: replicated
-      replicas: 1
-
-  celery_worker_json:
-    image: ${IMAGE_BASE}-backend
-    hostname: "{{.Service.Name}}.{{.Task.Slot}}"
-    networks:
-      - network_swarm_public
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - GUNICORN_WORKERS=4
-      - FRONTEND_URL=https://agentefrontlucas.agency10x.com.br
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ASSEMBLYAI_API_KEY=${ASSEMBLYAI_API_KEY}
-      - AGENT_API_KEY=${AGENT_API_KEY}
-      - ADMIN_EMAIL=${ADMIN_EMAIL}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - CORS_ALLOWED_ORIGINS=https://agentefrontlucas.agency10x.com.br
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
-      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
-      - S3_ENABLED=True
-      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
-      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
-      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}
-      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
-      - S3_REGION=${S3_REGION}
-    command: ["celery", "-A", "celery_app", "worker", "--loglevel=info", "-Q", "json_processing", "-c", "1"]
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER:-guest}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS:-guest}
     deploy:
       mode: replicated
       replicas: 1
       resources:
         limits:
           cpus: "1"
-          memory: 2048M
-
-  celery_worker:
-    image: ${IMAGE_BASE}-backend
-    hostname: "{{.Service.Name}}.{{.Task.Slot}}"
-    networks:
-      - network_swarm_public
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - GUNICORN_WORKERS=4
-      - FRONTEND_URL=https://agentefrontlucas.agency10x.com.br
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ASSEMBLYAI_API_KEY=${ASSEMBLYAI_API_KEY}
-      - AGENT_API_KEY=${AGENT_API_KEY}
-      - ADMIN_EMAIL=${ADMIN_EMAIL}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - CORS_ALLOWED_ORIGINS=https://agentefrontlucas.agency10x.com.br
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
-      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
-      - S3_ENABLED=True
-      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
-      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
-      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}
-      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
-      - S3_REGION=${S3_REGION}
-    command: ["celery", "-A", "celery_app", "worker", "--loglevel=info", "-Q", "celery"]
-    deploy:
-      mode: replicated
-      replicas: 1
-      resources:
-        limits:
-          cpus: "1"
-          memory: 4096M
+          memory: 1024M
 
   backend:
     image: ${IMAGE_BASE}-backend
@@ -111,13 +35,14 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - CORS_ALLOWED_ORIGINS=https://agentefrontlucas.agency10x.com.br
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
-      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
       - S3_ENABLED=True
       - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
       - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
       - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
       - S3_REGION=${S3_REGION}
+      - PYTHONUNBUFFERED=1
     deploy:
       mode: replicated
       replicas: 1
@@ -138,6 +63,38 @@ services:
         - traefik.http.services.agentes_backend.loadbalancer.passhostheader=true
         - traefik.http.middlewares.sslheader.headers.customrequestheaders.X-Forwarded-Proto=https
         - traefik.http.routers.agentes_backend.middlewares=sslheader@docker
+
+  worker:
+    image: ${IMAGE_BASE}-backend
+    hostname: "{{.Service.Name}}.{{.Task.Slot}}"
+    networks:
+      - network_swarm_public
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - FRONTEND_URL=https://agentefrontlucas.agency10x.com.br
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ASSEMBLYAI_API_KEY=${ASSEMBLYAI_API_KEY}
+      - AGENT_API_KEY=${AGENT_API_KEY}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - CORS_ALLOWED_ORIGINS=https://agentefrontlucas.agency10x.com.br
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      - S3_ENABLED=True
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - S3_REGION=${S3_REGION}
+      - PYTHONUNBUFFERED=1
+    command: [ "sh", "/app/entrypoint.sh", "worker" ]
+    deploy:
+      mode: replicated
+      replicas: 1
+      resources:
+        limits:
+          cpus: "1"
+          memory: 4096M
 
   frontend:
     image: ${IMAGE_BASE}-${FRONTEND_IMAGE_SUFFIX:-frontend}

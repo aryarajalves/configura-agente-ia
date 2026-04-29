@@ -16,10 +16,13 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Fallback para DATABASE_URL caso não esteja no .env
 if not os.getenv("DATABASE_URL"):
-    os.environ["DATABASE_URL"] = "postgresql+asyncpg://postgres:postgres@localhost:5433/ai_agent_db"
+    os.environ["DATABASE_URL"] = "postgresql+asyncpg://admin_agente:admin_agente_pwd_123@localhost:5433/rag_db"
 
 from main import app
 from database import get_db, Base
+import database
+# Desabilita o init_db global durante os testes para evitar conflitos de event loop
+database.init_db = lambda: asyncio.sleep(0) # Retorna uma corotina vazia
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -32,9 +35,9 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 @pytest.fixture
 async def db_engine():
-    from database import init_db
-    await init_db()
+    # Eliminamos o uso do init_db global que usa o motor global poluindo os loops
     test_engine = create_async_engine(DATABASE_URL)
+    # Criamos as tabelas diretamente com o motor de teste
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield test_engine

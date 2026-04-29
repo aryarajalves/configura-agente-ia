@@ -65,6 +65,8 @@ async def test_execute_chat_success():
     mock_agent.router_complex_model = ""
     mock_agent.router_complex_fallback_model = ""
     mock_agent.handoff_enabled = False
+    mock_agent.response_translation_enabled = False
+    mock_agent.response_translation_fallback_lang = "portuguese"
     mock_agent.safety_settings = ""
     mock_agent.model_settings = "{}"
     
@@ -91,7 +93,7 @@ async def test_execute_chat_success():
             headers = {"X-API-Key": "test-key"}
             response = await ac.post("/execute", json=payload, headers=headers)
     
-    app.dependency_overrides = {}
+    app.dependency_overrides.clear()
     
     assert response.status_code == 200
     data = response.json()
@@ -119,7 +121,7 @@ async def test_execute_chat_agent_not_found():
         with patch("main.os.getenv", return_value="test"):
             response = await ac.post("/execute", json=payload, headers=headers)
     
-    app.dependency_overrides = {}
+    app.dependency_overrides.clear()
     
     assert response.status_code == 404
     assert "not found" in response.json()["detail"].lower()
